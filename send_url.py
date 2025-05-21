@@ -6,7 +6,7 @@ import sys
 sio = socketio.Client()
 
 # 设置WebSocket服务器地址
-server_url = "http://192.168.1.138:5003"
+server_url = "http://47.106.254.103:5003"
 
 # 连接事件处理
 @sio.event
