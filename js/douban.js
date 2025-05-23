@@ -154,6 +154,12 @@ function initInfiniteScroll() {
         // 主动检查一次滚动状态
         handleScroll();
       }
+
+      if (event.data && event.data.type === 'FORCE_SCROLL_CHECK') {
+        console.log('收到强制滚动检查消息:', event.data);
+        // 强制检查滚动状态，不管其他条件
+        forceScrollCheck();
+      }
     });
 
     // 向父页面发送消息表示iframe已加载
@@ -1312,4 +1318,95 @@ function resetTagsToDefault() {
   renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart, true);
 
   showToast('已恢复默认标签', 'success');
+}
+
+// 强制滚动检查（忽略加载状态和内容状态）
+function forceScrollCheck() {
+  console.log('执行强制滚动检查');
+
+  // 检查豆瓣区域是否可见
+  const doubanArea = document.getElementById('doubanArea');
+  if (!doubanArea || doubanArea.classList.contains('hidden')) {
+    console.log('豆瓣区域不可见，跳过检查');
+    return;
+  }
+
+  // 如果正在加载，跳过
+  if (isLoadingMore) {
+    console.log('正在加载中，跳过强制检查');
+    return;
+  }
+
+  // 检查是否还有更多内容可以加载
+  if (!hasMoreContent) {
+    console.log('没有更多内容可加载');
+    return;
+  }
+
+  // 检查豆瓣结果容器
+  const doubanResults = document.getElementById('douban-results');
+  if (!doubanResults) {
+    console.log('找不到豆瓣结果容器');
+    return;
+  }
+
+  // 检查当前内容数量
+  const currentCards = doubanResults.children.length;
+  console.log('当前卡片数量:', currentCards);
+
+  // 检查容器高度和视窗高度
+  const containerHeight = doubanResults.offsetHeight;
+  const viewportHeight = window.innerHeight;
+  const documentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+
+  console.log('容器高度:', containerHeight, '视窗高度:', viewportHeight, '文档高度:', documentHeight);
+
+  // 多种触发条件
+  let shouldLoad = false;
+
+  // 条件1：内容不足一屏
+  if (containerHeight < viewportHeight * 1.2) {
+    console.log('内容高度不足，触发加载');
+    shouldLoad = true;
+  }
+
+  // 条件2：卡片数量较少
+  if (currentCards < 8) {
+    console.log('卡片数量不足，触发加载');
+    shouldLoad = true;
+  }
+
+  // 条件3：使用 getBoundingClientRect 检查容器位置
+  const rect = doubanResults.getBoundingClientRect();
+  const containerBottom = rect.bottom;
+  if (containerBottom <= viewportHeight + 200) {
+    console.log('容器底部接近视窗底部，触发加载');
+    shouldLoad = true;
+  }
+
+  // 条件4：文档高度接近视窗高度
+  if (documentHeight <= viewportHeight + 100) {
+    console.log('文档高度不足，触发加载');
+    shouldLoad = true;
+  }
+
+  if (shouldLoad) {
+    console.log('强制滚动检查：触发加载更多内容');
+    loadMoreDoubanContent();
+  } else {
+    console.log('强制滚动检查：暂不需要加载更多');
+
+    // 向父页面发送状态消息
+    try {
+      window.parent.postMessage({
+        type: 'SCROLL_STATUS',
+        needMore: false,
+        currentCards: currentCards,
+        containerHeight: containerHeight,
+        viewportHeight: viewportHeight
+      }, '*');
+    } catch (e) {
+      console.log('无法向父页面发送状态消息:', e);
+    }
+  }
 }
