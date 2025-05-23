@@ -592,6 +592,27 @@
     function initPlayer(videoUrl, sourceCode) {
       if (!videoUrl) return;
 
+      // 检测是否为电脑端设备
+      function isDesktop() {
+        const userAgent = navigator.userAgent.toLowerCase();
+        const mobileKeywords = ['android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'iemobile', 'opera mini', 'mobile'];
+
+        // 检查是否包含移动设备关键词
+        const isMobile = mobileKeywords.some(keyword => userAgent.includes(keyword));
+
+        // 检查屏幕尺寸（宽度大于1024px通常认为是电脑端）
+        const isLargeScreen = window.screen.width > 1024;
+
+        // 检查触摸支持（电脑端通常不支持触摸或支持但不是主要交互方式）
+        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        // 综合判断：不是移动设备 且 屏幕较大 且 (无触摸支持 或 屏幕很大)
+        return !isMobile && isLargeScreen && (!hasTouch || window.screen.width > 1366);
+      }
+
+      const isDesktopDevice = isDesktop();
+      console.log('设备检测结果:', isDesktopDevice ? '电脑端' : '移动端');
+
       // 配置HLS.js选项
       const hlsConfig = {
         debug: false,
@@ -681,6 +702,18 @@
                 playbackStarted = true;
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'none';
+
+                // 电脑端自动全屏
+                if (isDesktopDevice && dp && !dp.fullScreen.isFullScreen()) {
+                  setTimeout(() => {
+                    try {
+                      dp.fullScreen.request();
+                      console.log('电脑端自动进入全屏模式');
+                    } catch (e) {
+                      console.warn('自动全屏失败:', e);
+                    }
+                  }, 1000); // 延迟1秒确保播放器完全加载
+                }
               });
 
               // 监听视频进度事件
