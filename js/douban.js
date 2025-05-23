@@ -130,94 +130,24 @@ function initDouban() {
 
 // 初始化无限滚动
 function initInfiniteScroll() {
-  console.log('初始化无限滚动');
+  // 移除之前的滚动监听器（如果存在）
+  window.removeEventListener('scroll', handleScroll);
 
-  // 清理之前的监听器
-  if (window.infiniteScrollInterval) {
-    clearInterval(window.infiniteScrollInterval);
-  }
+  // 添加新的滚动监听器
+  window.addEventListener('scroll', handleScroll);
 
-  // 移除旧的事件监听器
-  document.removeEventListener('scroll', checkIfShouldLoadMore);
-  document.removeEventListener('wheel', checkIfShouldLoadMore);
-  document.removeEventListener('touchend', checkIfShouldLoadMore);
-  document.removeEventListener('mousemove', checkIfShouldLoadMore);
-  document.removeEventListener('click', checkIfShouldLoadMore);
+  // 调试信息
+  console.log('已初始化无限滚动监听器');
 
-  // 添加多种事件监听器来检测用户活动
-  document.addEventListener('scroll', checkIfShouldLoadMore, { passive: true });
-  document.addEventListener('wheel', checkIfShouldLoadMore, { passive: true });
-  document.addEventListener('touchend', checkIfShouldLoadMore, { passive: true });
-  document.addEventListener('mousemove', throttle(checkIfShouldLoadMore, 1000), { passive: true });
-  document.addEventListener('click', checkIfShouldLoadMore, { passive: true });
-
-  // 保持定时器作为备用
-  window.infiniteScrollInterval = setInterval(() => {
-    checkIfShouldLoadMore();
-  }, 2000); // 每2秒检查一次
-
-  // 添加更频繁的检查当用户在豆瓣区域时
-  setupDoubanAreaWatcher();
-
-  console.log('已启动多重触发机制的无限滚动');
+  // 初始检查是否需要加载更多（针对内容不足一屏的情况）
+  setTimeout(() => {
+    console.log('初始检查是否需要加载更多');
+    handleScroll();
+  }, 1000);
 }
 
-// 节流函数
-function throttle(func, delay) {
-  let timeoutId;
-  let lastExecTime = 0;
-  return function (...args) {
-    const currentTime = Date.now();
-
-    if (currentTime - lastExecTime > delay) {
-      func.apply(this, args);
-      lastExecTime = currentTime;
-    } else {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        func.apply(this, args);
-        lastExecTime = Date.now();
-      }, delay - (currentTime - lastExecTime));
-    }
-  };
-}
-
-// 设置豆瓣区域监视器
-function setupDoubanAreaWatcher() {
-  const doubanArea = document.getElementById('doubanArea');
-  if (!doubanArea) return;
-
-  // 当鼠标进入豆瓣区域时，启动更频繁的检查
-  let quickCheckInterval;
-
-  doubanArea.addEventListener('mouseenter', () => {
-    console.log('鼠标进入豆瓣区域，启动快速检查');
-    if (quickCheckInterval) clearInterval(quickCheckInterval);
-    quickCheckInterval = setInterval(() => {
-      checkIfShouldLoadMore();
-    }, 200); // 每200ms检查一次
-  });
-
-  doubanArea.addEventListener('mouseleave', () => {
-    console.log('鼠标离开豆瓣区域，停止快速检查');
-    if (quickCheckInterval) {
-      clearInterval(quickCheckInterval);
-      quickCheckInterval = null;
-    }
-  });
-
-  // 添加触摸事件支持
-  doubanArea.addEventListener('touchstart', () => {
-    setTimeout(checkIfShouldLoadMore, 500);
-  }, { passive: true });
-
-  doubanArea.addEventListener('touchmove', throttle(() => {
-    checkIfShouldLoadMore();
-  }, 500), { passive: true });
-}
-
-// 检查是否应该加载更多内容
-function checkIfShouldLoadMore() {
+// 处理滚动事件
+function handleScroll() {
   // 检查豆瓣区域是否可见
   const doubanArea = document.getElementById('doubanArea');
   if (!doubanArea || doubanArea.classList.contains('hidden')) {
@@ -229,75 +159,16 @@ function checkIfShouldLoadMore() {
     return;
   }
 
-  // 获取豆瓣结果容器
-  const doubanResults = document.getElementById('douban-results');
-  if (!doubanResults) {
-    return;
-  }
+  // 检查是否滚动到接近底部（距离底部200px时开始加载）
+  const scrollHeight = document.documentElement.scrollHeight;
+  const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+  const clientHeight = document.documentElement.clientHeight;
 
-  // 检查容器是否有内容
-  if (doubanResults.children.length === 0) {
-    return;
-  }
+  // 调试信息
+  console.log('滚动位置:', scrollTop + clientHeight, '触发位置:', scrollHeight - 200, '差值:', scrollHeight - 200 - (scrollTop + clientHeight));
 
-  // 检查豆瓣区域是否在用户视窗内
-  const doubanRect = doubanArea.getBoundingClientRect();
-  const windowHeight = window.innerHeight;
-
-  // 如果豆瓣区域不在视窗内，不检查
-  if (doubanRect.bottom < 0 || doubanRect.top > windowHeight) {
-    return;
-  }
-
-  // 获取最后几个电影卡片
-  const cards = doubanResults.children;
-  const lastCard = cards[cards.length - 1];
-  const secondLastCard = cards.length > 1 ? cards[cards.length - 2] : null;
-
-  if (!lastCard) {
-    return;
-  }
-
-  // 获取最后一个卡片的位置信息
-  const lastCardRect = lastCard.getBoundingClientRect();
-
-  // 多种触发条件：
-  // 1. 最后一个卡片进入视窗
-  // 2. 最后一个卡片距离视窗底部较近
-  // 3. 倒数第二个卡片完全可见
-
-  const triggerDistance = 500; // 增加到500px
-  const condition1 = lastCardRect.top < windowHeight + triggerDistance;
-  const condition2 = lastCardRect.bottom <= windowHeight + triggerDistance;
-
-  let condition3 = false;
-  if (secondLastCard) {
-    const secondLastRect = secondLastCard.getBoundingClientRect();
-    condition3 = secondLastRect.bottom <= windowHeight;
-  }
-
-  const shouldLoad = condition1 || condition2 || condition3;
-
-  // 调试信息（每10次输出一次，避免刷屏）
-  if (!window.debugCounter) window.debugCounter = 0;
-  if (window.debugCounter % 10 === 0) {
-    console.log('无限滚动检查:', {
-      doubanInView: `top:${doubanRect.top.toFixed(0)}, bottom:${doubanRect.bottom.toFixed(0)}`,
-      lastCardTop: lastCardRect.top.toFixed(0),
-      lastCardBottom: lastCardRect.bottom.toFixed(0),
-      windowHeight: windowHeight,
-      triggerPoint: windowHeight + triggerDistance,
-      condition1: condition1,
-      condition2: condition2,
-      condition3: condition3,
-      shouldLoad: shouldLoad,
-      cardsCount: cards.length
-    });
-  }
-  window.debugCounter++;
-
-  if (shouldLoad) {
-    console.log('🎯 触发自动加载更多内容！');
+  if (scrollTop + clientHeight >= scrollHeight - 200) {
+    console.log('触发加载更多内容');
     loadMoreDoubanContent();
   }
 }
@@ -457,29 +328,13 @@ function showLoadMoreIndicator(message, isError = false) {
     doubanContainer.appendChild(indicator);
   }
 
-  if (isError) {
-    indicator.className = `text-center py-4 text-sm text-red-400`;
-    indicator.innerHTML = `
-        <div class="text-red-400 mb-2">${message}</div>
-        <button onclick="loadMoreDoubanContent()" 
-                class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded text-sm">
-            手动加载更多
-        </button>
-    `;
-  } else {
-    indicator.className = `text-center py-4 text-sm text-gray-400`;
-    indicator.innerHTML = `
-        <div class="flex items-center justify-center mb-2">
-            <div class="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-            <span class="text-pink-500">${message}</span>
-        </div>
-        <div class="text-xs text-gray-500">如果加载时间过长，可以</div>
-        <button onclick="loadMoreDoubanContent()" 
-                class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs mt-1">
-            手动重试
-        </button>
-    `;
-  }
+  indicator.className = `text-center py-4 text-sm ${isError ? 'text-red-400' : 'text-gray-400'}`;
+  indicator.innerHTML = isError ?
+    `<div class="text-red-400">${message}</div>` :
+    `<div class="flex items-center justify-center">
+      <div class="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+      <span class="text-pink-500">${message}</span>
+    </div>`;
 
   indicator.style.display = 'block';
 }
@@ -490,82 +345,6 @@ function hideLoadMoreIndicator() {
   if (indicator) {
     indicator.style.display = 'none';
   }
-}
-
-// 抽取渲染豆瓣卡片的逻辑到单独函数
-function renderDoubanCards(data, container) {
-  // 创建文档片段以提高性能
-  const fragment = document.createDocumentFragment();
-
-  // 如果没有数据
-  if (!data.subjects || data.subjects.length === 0) {
-    const emptyEl = document.createElement("div");
-    emptyEl.className = "col-span-full text-center py-8";
-    emptyEl.innerHTML = `
-        <div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>
-    `;
-    fragment.appendChild(emptyEl);
-  } else {
-    // 循环创建每个影视卡片
-    data.subjects.forEach(item => {
-      const card = document.createElement("div");
-      card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
-
-      // 生成卡片内容，确保安全显示（防止XSS）
-      const safeTitle = item.title
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-
-      const safeRate = (item.rate || "暂无")
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-      // 处理图片URL
-      // 1. 直接使用豆瓣图片URL (添加no-referrer属性)
-      const originalCoverUrl = item.cover;
-
-      // 2. 也准备代理URL作为备选
-      const proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
-
-      // 为不同设备优化卡片布局
-      card.innerHTML = `
-        <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-          <img src="${originalCoverUrl}" alt="${safeTitle}" 
-            class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-            onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
-            loading="lazy" referrerpolicy="no-referrer">
-          <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
-          <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
-            <span class="text-yellow-400">★</span> ${safeRate}
-          </div>
-          <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
-            <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
-              🔗
-            </a>
-          </div>
-        </div>
-        <div class="p-2 text-center bg-[#111]">
-          <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
-            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
-            title="${safeTitle}">
-            ${safeTitle}
-          </button>
-        </div>
-      `;
-
-      fragment.appendChild(card);
-    });
-  }
-
-  // 清空并添加所有新元素
-  container.innerHTML = "";
-  container.appendChild(fragment);
-
-  // 检查内容是否足够填满屏幕
-  setTimeout(() => {
-    checkContentHeight();
-  }, 500);
 }
 
 // 追加豆瓣卡片（不清空现有内容）
@@ -625,34 +404,6 @@ function appendDoubanCards(data) {
 
   // 将新卡片追加到容器中
   container.appendChild(fragment);
-
-  // 检查内容是否足够
-  setTimeout(() => {
-    checkContentHeight();
-  }, 500);
-}
-
-// 检查内容高度，如果不足则自动加载更多
-function checkContentHeight() {
-  const doubanArea = document.getElementById('doubanArea');
-  const doubanResults = document.getElementById('douban-results');
-
-  if (!doubanArea || !doubanResults || isLoadingMore || !hasMoreContent) {
-    return;
-  }
-
-  if (doubanArea.classList.contains('hidden')) {
-    return;
-  }
-
-  const doubanRect = doubanArea.getBoundingClientRect();
-  const windowHeight = window.innerHeight;
-
-  // 如果豆瓣区域的底部在视窗内，说明内容可能不够
-  if (doubanRect.bottom < windowHeight * 1.5) {
-    console.log('🔄 内容不足，自动加载更多');
-    loadMoreDoubanContent();
-  }
 }
 
 // 根据设置更新豆瓣区域的显示状态
@@ -1044,6 +795,77 @@ async function fetchDoubanData(url) {
       throw fallbackErr; // 向上抛出错误，让调用者处理
     }
   }
+}
+
+// 抽取渲染豆瓣卡片的逻辑到单独函数
+function renderDoubanCards(data, container) {
+  // 创建文档片段以提高性能
+  const fragment = document.createDocumentFragment();
+
+  // 如果没有数据
+  if (!data.subjects || data.subjects.length === 0) {
+    const emptyEl = document.createElement("div");
+    emptyEl.className = "col-span-full text-center py-8";
+    emptyEl.innerHTML = `
+            <div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>
+        `;
+    fragment.appendChild(emptyEl);
+  } else {
+    // 循环创建每个影视卡片
+    data.subjects.forEach(item => {
+      const card = document.createElement("div");
+      card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
+
+      // 生成卡片内容，确保安全显示（防止XSS）
+      const safeTitle = item.title
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+      const safeRate = (item.rate || "暂无")
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // 处理图片URL
+      // 1. 直接使用豆瓣图片URL (添加no-referrer属性)
+      const originalCoverUrl = item.cover;
+
+      // 2. 也准备代理URL作为备选
+      const proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
+
+      // 为不同设备优化卡片布局
+      card.innerHTML = `
+                <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
+                    <img src="${originalCoverUrl}" alt="${safeTitle}" 
+                        class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                        onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
+                        loading="lazy" referrerpolicy="no-referrer">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
+                    <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
+                        <span class="text-yellow-400">★</span> ${safeRate}
+                    </div>
+                    <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
+                            🔗
+                        </a>
+                    </div>
+                </div>
+                <div class="p-2 text-center bg-[#111]">
+                    <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
+                            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
+                            title="${safeTitle}">
+                        ${safeTitle}
+                    </button>
+                </div>
+            `;
+
+      fragment.appendChild(card);
+    });
+  }
+
+  // 清空并添加所有新元素
+  container.innerHTML = "";
+  container.appendChild(fragment);
 }
 
 // 重置到首页
