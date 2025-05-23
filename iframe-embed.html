@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>嵌套页面 - localhost:8080</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .header h1 {
+      margin: 0;
+      color: #333;
+    }
+
+    .iframe-wrapper {
+      position: relative;
+      width: 100%;
+      height: calc(100vh - 140px);
+      background-color: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .iframe-container {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #666;
+      font-size: 16px;
+    }
+
+    .error-message {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #ff6b6b;
+      font-size: 16px;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 10px;
+      }
+
+      .iframe-wrapper {
+        height: calc(100vh - 120px);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>嵌套页面</h1>
+      <p>正在加载 <strong>http://localhost:8080</strong></p>
+    </div>
+
+    <div class="iframe-wrapper">
+      <div class="loading" id="loading">正在加载中...</div>
+      <div class="error-message" id="errorMessage">
+        <h3>加载失败</h3>
+        <p>无法连接到 http://localhost:8080</p>
+        <p>请确保目标服务正在运行</p>
+        <button onclick="reloadIframe()">重新加载</button>
+      </div>
+      <iframe id="mainIframe" class="iframe-container" src="http://192.168.1.125:8080" title="嵌套内容"
+        onload="handleIframeLoad()" onerror="handleIframeError()">
+        您的浏览器不支持iframe。
+      </iframe>
+    </div>
+  </div>
+
+  <script>
+    let loadTimeout;
+
+    function handleIframeLoad() {
+      console.log('Iframe 加载成功');
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'none';
+      clearTimeout(loadTimeout);
+    }
+
+    function handleIframeError() {
+      console.log('Iframe 加载失败');
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('errorMessage').style.display = 'block';
+      clearTimeout(loadTimeout);
+    }
+
+    function reloadIframe() {
+      const iframe = document.getElementById('mainIframe');
+      const loading = document.getElementById('loading');
+      const errorMessage = document.getElementById('errorMessage');
+
+      loading.style.display = 'block';
+      errorMessage.style.display = 'none';
+
+      iframe.src = iframe.src;
+
+      // 设置超时检测
+      loadTimeout = setTimeout(() => {
+        handleIframeError();
+      }, 10000); // 10秒超时
+    }
+
+    // 页面加载时设置超时检测
+    window.onload = function () {
+      loadTimeout = setTimeout(() => {
+        if (document.getElementById('loading').style.display !== 'none') {
+          handleIframeError();
+        }
+      }, 10000);
+    };
+
+    // 处理iframe通信（如果需要）
+    window.addEventListener('message', function (event) {
+      // 根据需要处理来自iframe的消息
+      console.log('收到iframe消息:', event.data);
+    });
+  </script>
+</body>
+
+</html>

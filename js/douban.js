@@ -132,9 +132,77 @@ function initDouban() {
 function initInfiniteScroll() {
   // 移除之前的滚动监听器（如果存在）
   window.removeEventListener('scroll', handleScroll);
+  document.removeEventListener('scroll', handleScroll);
 
-  // 添加新的滚动监听器
-  window.addEventListener('scroll', handleScroll);
+  // 检查是否在iframe中
+  const isInIframe = window.self !== window.top;
+  console.log('是否在iframe中:', isInIframe);
+
+  // 添加多个滚动监听器以确保兼容性
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  document.addEventListener('scroll', handleScroll, { passive: true });
+
+  // 如果在iframe中，还需要监听document body的滚动
+  if (isInIframe) {
+    document.body.addEventListener('scroll', handleScroll, { passive: true });
+    document.documentElement.addEventListener('scroll', handleScroll, { passive: true });
+
+    // 监听来自父页面的消息
+    window.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'TEST_SCROLL') {
+        console.log('收到父页面滚动测试消息:', event.data);
+        // 主动检查一次滚动状态
+        handleScroll();
+      }
+    });
+
+    // 向父页面发送消息表示iframe已加载
+    try {
+      window.parent.postMessage({
+        type: 'IFRAME_LOADED',
+        message: 'LibreTV iframe已加载完成'
+      }, '*');
+    } catch (e) {
+      console.log('无法向父页面发送消息:', e);
+    }
+
+    // 添加更多的事件监听器以捕获各种滚动情况
+    ['wheel', 'touchmove', 'keydown'].forEach(eventType => {
+      document.addEventListener(eventType, function () {
+        // 延迟检查滚动状态，确保DOM已更新
+        setTimeout(handleScroll, 100);
+      }, { passive: true });
+    });
+
+    // 监听窗口大小变化，可能会影响滚动检测
+    window.addEventListener('resize', function () {
+      setTimeout(handleScroll, 200);
+    });
+
+    // 添加观察者模式，监听DOM变化
+    if (window.MutationObserver) {
+      const observer = new MutationObserver(function (mutations) {
+        let shouldCheck = false;
+        mutations.forEach(function (mutation) {
+          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            shouldCheck = true;
+          }
+        });
+        if (shouldCheck) {
+          setTimeout(handleScroll, 300);
+        }
+      });
+
+      // 观察豆瓣结果容器的变化
+      const doubanResults = document.getElementById('douban-results');
+      if (doubanResults) {
+        observer.observe(doubanResults, {
+          childList: true,
+          subtree: true
+        });
+      }
+    }
+  }
 
   // 调试信息
   console.log('已初始化无限滚动监听器');
@@ -143,7 +211,34 @@ function initInfiniteScroll() {
   setTimeout(() => {
     console.log('初始检查是否需要加载更多');
     handleScroll();
-  }, 1000);
+  }, 2000); // 增加延迟确保DOM完全渲染
+
+  // 定期检查滚动状态（作为备用方案）
+  setInterval(() => {
+    if (isInIframe) {
+      handleScroll();
+    }
+  }, 5000); // 每5秒检查一次
+
+  // 在iframe环境中添加更频繁的检查
+  if (isInIframe) {
+    // 前30秒内更频繁地检查（页面可能还在加载内容）
+    let quickCheckCount = 0;
+    const quickCheckInterval = setInterval(() => {
+      handleScroll();
+      quickCheckCount++;
+      if (quickCheckCount >= 10) { // 10次后停止快速检查
+        clearInterval(quickCheckInterval);
+      }
+    }, 3000); // 每3秒检查一次
+
+    // 监听用户交互事件，交互后检查滚动
+    ['click', 'touchstart', 'keydown'].forEach(eventType => {
+      document.addEventListener(eventType, function () {
+        setTimeout(handleScroll, 500);
+      }, { passive: true });
+    });
+  }
 }
 
 // 处理滚动事件
@@ -159,17 +254,103 @@ function handleScroll() {
     return;
   }
 
-  // 检查是否滚动到接近底部（距离底部200px时开始加载）
-  const scrollHeight = document.documentElement.scrollHeight;
-  const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
-  const clientHeight = document.documentElement.clientHeight;
+  // 检查是否在iframe中
+  const isInIframe = window.self !== window.top;
+
+  // 获取多种滚动位置和高度信息，以应对不同的iframe环境
+  let scrollHeight, scrollTop, clientHeight;
+
+  if (isInIframe) {
+    // 在iframe中，尝试获取多种高度和滚动位置
+    scrollHeight = Math.max(
+      document.documentElement.scrollHeight,
+      document.body.scrollHeight,
+      document.documentElement.offsetHeight,
+      document.body.offsetHeight,
+      window.innerHeight + document.documentElement.scrollTop,
+      window.innerHeight + document.body.scrollTop
+    );
+
+    scrollTop = Math.max(
+      document.documentElement.scrollTop,
+      document.body.scrollTop,
+      window.pageYOffset || 0,
+      window.scrollY || 0
+    );
+
+    clientHeight = Math.max(
+      document.documentElement.clientHeight,
+      document.body.clientHeight,
+      window.innerHeight || 0
+    );
+
+    // 特殊处理：在某些iframe环境中，尝试获取豆瓣结果容器的位置信息
+    const doubanResults = document.getElementById('douban-results');
+    if (doubanResults) {
+      const resultsRect = doubanResults.getBoundingClientRect();
+      const containerBottom = resultsRect.bottom;
+      const viewportHeight = window.innerHeight;
+
+      // 如果豆瓣结果容器的底部接近视窗底部，触发加载
+      if (containerBottom <= viewportHeight + 300) {
+        console.log('通过容器位置检测触发加载更多');
+        loadMoreDoubanContent();
+        return;
+      }
+    }
+  } else {
+    // 非iframe环境，使用标准方法
+    scrollHeight = Math.max(
+      document.documentElement.scrollHeight,
+      document.body.scrollHeight,
+      document.documentElement.offsetHeight,
+      document.body.offsetHeight
+    );
+
+    scrollTop = Math.max(
+      document.documentElement.scrollTop,
+      document.body.scrollTop,
+      window.pageYOffset || 0
+    );
+
+    clientHeight = Math.max(
+      document.documentElement.clientHeight,
+      window.innerHeight || 0
+    );
+  }
 
   // 调试信息
-  console.log('滚动位置:', scrollTop + clientHeight, '触发位置:', scrollHeight - 200, '差值:', scrollHeight - 200 - (scrollTop + clientHeight));
+  console.log('滚动检查 - iframe模式:', isInIframe, '高度:', scrollHeight, '滚动位置:', scrollTop, '视窗高度:', clientHeight);
+  console.log('当前位置:', scrollTop + clientHeight, '触发位置:', scrollHeight - 300);
 
-  if (scrollTop + clientHeight >= scrollHeight - 200) {
+  // 在iframe中使用更宽松的触发条件
+  const triggerThreshold = isInIframe ? 500 : 300;
+
+  // 降低触发阈值以便更容易触发
+  if (scrollTop + clientHeight >= scrollHeight - triggerThreshold) {
     console.log('触发加载更多内容');
     loadMoreDoubanContent();
+    return;
+  }
+
+  // 额外检查：如果内容高度不足，也尝试加载
+  const minHeightThreshold = isInIframe ? 200 : 100;
+  if (scrollHeight <= clientHeight + minHeightThreshold && hasMoreContent) {
+    console.log('内容不足一屏，自动加载更多');
+    loadMoreDoubanContent();
+    return;
+  }
+
+  // 在iframe环境中，添加基于页面可见区域的检测
+  if (isInIframe) {
+    const bodyHeight = document.body.offsetHeight;
+    const windowHeight = window.innerHeight;
+
+    // 如果页面内容高度小于窗口高度的1.5倍，认为需要更多内容
+    if (bodyHeight < windowHeight * 1.5 && hasMoreContent) {
+      console.log('iframe环境检测到内容不足，触发加载');
+      loadMoreDoubanContent();
+    }
   }
 }
 
@@ -328,16 +509,50 @@ function showLoadMoreIndicator(message, isError = false) {
     doubanContainer.appendChild(indicator);
   }
 
+  // 检查是否在iframe中
+  const isInIframe = window.self !== window.top;
+
   indicator.className = `text-center py-4 text-sm ${isError ? 'text-red-400' : 'text-gray-400'}`;
-  indicator.innerHTML = isError ?
-    `<div class="text-red-400">${message}</div>` :
-    `<div class="flex items-center justify-center">
-      <div class="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-      <span class="text-pink-500">${message}</span>
-    </div>`;
+
+  if (isError) {
+    indicator.innerHTML = `<div class="text-red-400">${message}</div>`;
+  } else {
+    indicator.innerHTML = `
+        <div class="flex items-center justify-center">
+            <div class="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+            <span class="text-pink-500">${message}</span>
+        </div>
+    `;
+  }
+
+  // 如果在iframe中且已经加载完所有内容，添加手动加载按钮
+  if (isInIframe && (message.includes('已加载所有内容') || message.includes('已浏览完'))) {
+    indicator.innerHTML += `
+        <div class="mt-4">
+            <button 
+                onclick="manualLoadMore()" 
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+                手动加载更多
+            </button>
+            <p class="text-xs text-gray-500 mt-2">在iframe环境中，您可以点击此按钮手动加载更多内容</p>
+        </div>
+    `;
+  }
 
   indicator.style.display = 'block';
 }
+
+// 手动加载更多内容的函数
+window.manualLoadMore = function () {
+  console.log('手动触发加载更多');
+
+  // 重置状态
+  hasMoreContent = true;
+  isLoadingMore = false;
+
+  // 强制触发加载
+  loadMoreDoubanContent();
+};
 
 // 隐藏加载更多指示器
 function hideLoadMoreIndicator() {

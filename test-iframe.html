@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LibreTV 嵌套测试页面</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .tabs {
+      display: flex;
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 15px 20px;
+      background: #f8f9fa;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .tab.active {
+      background: white;
+      border-bottom: 3px solid #667eea;
+      color: #667eea;
+      font-weight: bold;
+    }
+
+    .tab:hover {
+      background: #e9ecef;
+    }
+
+    .tab-content {
+      display: none;
+      min-height: 800px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .movie-iframe-container {
+      width: 100%;
+      height: 800px;
+      position: relative;
+    }
+
+    #movie-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .info-content {
+      padding: 40px;
+      text-align: center;
+    }
+
+    .info-content h2 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .info-content p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+
+    .test-buttons {
+      margin: 20px;
+      text-align: center;
+    }
+
+    .test-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 0 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .test-btn:hover {
+      background: #5a6fd8;
+    }
+
+    .status {
+      margin: 20px;
+      padding: 15px;
+      background: #e8f4f8;
+      border-left: 4px solid #17a2b8;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎬 影视娱乐平台</h1>
+      <p>集成多种影视资源，为您提供一站式观影体验</p>
+    </div>
+
+    <div class="test-buttons">
+      <button class="test-btn" onclick="reloadIframe()">重新加载</button>
+      <button class="test-btn" onclick="testScroll()">测试滚动</button>
+      <button class="test-btn" onclick="toggleFullscreen()">全屏模式</button>
+    </div>
+
+    <div class="status" id="status">
+      <strong>状态：</strong>正在加载 LibreTV...
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('movie')">🎭 在线影视</button>
+      <button class="tab" onclick="showTab('info')">ℹ️ 关于项目</button>
+    </div>
+
+    <div class="tab-contents">
+      <!-- 电影Tab内容 -->
+      <div id="movie-content" class="tab-content active">
+        <div class="movie-iframe-container">
+          <iframe id="movie-iframe" src="http://192.168.1.125:5003/" frameborder="0" allowfullscreen
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
+            loading="lazy">
+          </iframe>
+        </div>
+      </div>
+
+      <!-- 信息Tab内容 -->
+      <div id="info-content" class="tab-content">
+        <div class="info-content">
+          <h2>关于 LibreTV</h2>
+          <p>LibreTV 是一个免费的在线视频搜索与观看平台，提供来自多个视频源的内容搜索与播放服务。</p>
+          <p>🎯 <strong>主要特性：</strong></p>
+          <p>• 无需注册，即开即用</p>
+          <p>• 多源聚合搜索</p>
+          <p>• 支持豆瓣热门推荐</p>
+          <p>• 无限滚动自动加载</p>
+          <p>• 自动标签切换功能</p>
+          <p>• 响应式设计，支持多设备</p>
+
+          <h2>嵌套测试说明</h2>
+          <p>当前页面用于测试 LibreTV 在 iframe 中的滚动功能和交互体验。</p>
+          <p>如果发现滚动无法触发自动加载，请检查 iframe 的滚动事件监听。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab切换功能
+    function showTab(tabName) {
+      // 隐藏所有tab内容
+      const contents = document.querySelectorAll('.tab-content');
+      contents.forEach(content => content.classList.remove('active'));
+
+      // 移除所有tab的active状态
+      const tabs = document.querySelectorAll('.tab');
+      tabs.forEach(tab => tab.classList.remove('active'));
+
+      // 显示选中的tab内容
+      document.getElementById(tabName + '-content').classList.add('active');
+
+      // 设置选中的tab为active
+      event.target.classList.add('active');
+    }
+
+    // 重新加载iframe
+    function reloadIframe() {
+      const iframe = document.getElementById('movie-iframe');
+      iframe.src = iframe.src;
+      updateStatus('正在重新加载...');
+    }
+
+    // 测试滚动功能
+    function testScroll() {
+      const iframe = document.getElementById('movie-iframe');
+      try {
+        // 向iframe发送消息测试滚动
+        iframe.contentWindow.postMessage({
+          type: 'TEST_SCROLL',
+          message: '测试滚动功能'
+        }, '*');
+        updateStatus('已发送滚动测试消息到iframe');
+      } catch (e) {
+        updateStatus('无法与iframe通信，可能存在跨域限制');
+      }
+    }
+
+    // 切换全屏
+    function toggleFullscreen() {
+      const container = document.querySelector('.movie-iframe-container');
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+        updateStatus('退出全屏模式');
+      } else {
+        container.requestFullscreen().then(() => {
+          updateStatus('进入全屏模式');
+        }).catch(err => {
+          updateStatus('无法进入全屏模式: ' + err.message);
+        });
+      }
+    }
+
+    // 更新状态信息
+    function updateStatus(message) {
+      const status = document.getElementById('status');
+      const timestamp = new Date().toLocaleTimeString();
+      status.innerHTML = `<strong>状态：</strong>${message} <small>(${timestamp})</small>`;
+    }
+
+    // 监听iframe加载事件
+    document.getElementById('movie-iframe').addEventListener('load', function () {
+      updateStatus('LibreTV 加载完成');
+    });
+
+    // 监听iframe错误事件
+    document.getElementById('movie-iframe').addEventListener('error', function () {
+      updateStatus('LibreTV 加载失败，请检查网络连接');
+    });
+
+    // 监听来自iframe的消息
+    window.addEventListener('message', function (event) {
+      // 只接受来自指定源的消息
+      if (event.origin !== 'http://192.168.1.125:5003') {
+        return;
+      }
+
+      console.log('收到iframe消息:', event.data);
+      updateStatus('收到iframe消息: ' + JSON.stringify(event.data));
+    });
+
+    // 页面加载完成
+    document.addEventListener('DOMContentLoaded', function () {
+      updateStatus('测试页面已准备就绪');
+    });
+  </script>
+</body>
+
+</html>
