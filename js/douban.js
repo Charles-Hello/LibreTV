@@ -56,7 +56,6 @@ const doubanPageSize = 16; // 一次显示的项目数量
 // 添加无限滚动相关变量
 let isLoadingMore = false; // 是否正在加载更多
 let hasMoreContent = true; // 是否还有更多内容
-let scrollObserver = null; // Intersection Observer实例
 
 // 初始化豆瓣功能
 function initDouban() {
@@ -121,9 +120,6 @@ function initDouban() {
   // 初始化无限滚动
   initInfiniteScroll();
 
-  // 初始化iframe通信机制
-  initIframeScrollCommunication();
-
   // 确保在DOM完全加载后添加滚动监听
   if (document.readyState === 'complete') {
     initInfiniteScroll();
@@ -134,114 +130,23 @@ function initDouban() {
 
 // 初始化无限滚动
 function initInfiniteScroll() {
-  // 移除之前的滚动监听器（如果存在）
-  window.removeEventListener('scroll', handleScroll);
-  document.removeEventListener('scroll', handleScroll);
+  console.log('初始化无限滚动');
 
-  // 添加新的滚动监听器 - 同时监听window和document
-  window.addEventListener('scroll', handleScroll, { passive: true });
-  document.addEventListener('scroll', handleScroll, { passive: true });
-
-  // 如果在iframe中，也监听iframe的滚动
-  if (window.parent !== window) {
-    console.log('检测到iframe环境，添加iframe滚动监听');
-    try {
-      // 尝试监听父窗口的滚动（如果同源）
-      window.parent.addEventListener('scroll', handleScroll, { passive: true });
-    } catch (e) {
-      console.log('无法监听父窗口滚动（跨域限制）');
-    }
+  // 清理之前的监听器
+  if (window.infiniteScrollInterval) {
+    clearInterval(window.infiniteScrollInterval);
   }
 
-  // 初始化Intersection Observer作为备用方案
-  initScrollObserver();
+  // 使用定时器方案，更可靠
+  window.infiniteScrollInterval = setInterval(() => {
+    checkIfShouldLoadMore();
+  }, 500); // 每500ms检查一次
 
-  // 调试信息
-  console.log('已初始化无限滚动监听器');
-
-  // 初始检查是否需要加载更多（针对内容不足一屏的情况）
-  setTimeout(() => {
-    console.log('初始检查是否需要加载更多');
-    handleScroll();
-  }, 1000);
+  console.log('已启动定时器检查无限滚动');
 }
 
-// 初始化滚动观察器（使用Intersection Observer）
-function initScrollObserver() {
-  // 如果浏览器不支持Intersection Observer，跳过
-  if (!window.IntersectionObserver) {
-    console.log('浏览器不支持Intersection Observer');
-    return;
-  }
-
-  // 清理之前的观察器
-  if (scrollObserver) {
-    scrollObserver.disconnect();
-  }
-
-  // 创建观察器
-  scrollObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        console.log('通过Intersection Observer检测到滚动到底部');
-        // 检查豆瓣区域是否可见且需要加载更多内容
-        const doubanArea = document.getElementById('doubanArea');
-        if (doubanArea && !doubanArea.classList.contains('hidden') &&
-          !isLoadingMore && hasMoreContent) {
-          loadMoreDoubanContent();
-        }
-      }
-    });
-  }, {
-    root: null, // 使用视窗作为根
-    rootMargin: '200px', // 提前200px触发
-    threshold: 0
-  });
-
-  // 创建观察目标元素
-  createScrollTarget();
-}
-
-// 创建滚动目标元素
-function createScrollTarget() {
-  // 移除之前的目标元素
-  const oldTarget = document.getElementById('scroll-target');
-  if (oldTarget) {
-    if (scrollObserver) {
-      scrollObserver.unobserve(oldTarget);
-    }
-    oldTarget.remove();
-  }
-
-  // 创建新的目标元素
-  const target = document.createElement('div');
-  target.id = 'scroll-target';
-  target.style.cssText = `
-    position: absolute;
-    bottom: 200px;
-    left: 0;
-    width: 1px;
-    height: 1px;
-    pointer-events: none;
-    opacity: 0;
-  `;
-
-  // 将目标元素添加到豆瓣区域
-  const doubanArea = document.getElementById('doubanArea');
-  if (doubanArea) {
-    doubanArea.style.position = 'relative';
-    doubanArea.appendChild(target);
-
-    // 开始观察
-    if (scrollObserver) {
-      scrollObserver.observe(target);
-      console.log('已设置Intersection Observer目标元素');
-    }
-  }
-}
-
-// 处理滚动事件
-function handleScroll(event) {
+// 检查是否应该加载更多内容
+function checkIfShouldLoadMore() {
   // 检查豆瓣区域是否可见
   const doubanArea = document.getElementById('doubanArea');
   if (!doubanArea || doubanArea.classList.contains('hidden')) {
@@ -253,44 +158,43 @@ function handleScroll(event) {
     return;
   }
 
-  // 获取滚动元素（优先使用事件目标，否则使用默认元素）
-  let scrollElement = document.documentElement;
-  let scrollContainer = window;
-
-  // 如果事件来自特定元素，使用该元素
-  if (event && event.target) {
-    if (event.target === document) {
-      scrollElement = document.documentElement;
-    } else if (event.target === window.parent) {
-      // 如果是父窗口滚动，需要特殊处理
-      try {
-        scrollElement = window.parent.document.documentElement;
-        scrollContainer = window.parent;
-      } catch (e) {
-        // 跨域情况下无法访问父窗口信息
-        return;
-      }
-    }
+  // 获取豆瓣结果容器
+  const doubanResults = document.getElementById('douban-results');
+  if (!doubanResults) {
+    return;
   }
 
-  // 检查是否滚动到接近底部（距离底部200px时开始加载）
-  const scrollHeight = scrollElement.scrollHeight;
-  const scrollTop = scrollElement.scrollTop || document.body.scrollTop;
-  const clientHeight = scrollElement.clientHeight;
+  // 检查容器是否有内容
+  if (doubanResults.children.length === 0) {
+    return;
+  }
+
+  // 获取最后一个电影卡片
+  const lastCard = doubanResults.lastElementChild;
+  if (!lastCard) {
+    return;
+  }
+
+  // 获取最后一个卡片的位置信息
+  const rect = lastCard.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
+
+  // 如果最后一个卡片进入视窗底部300px范围内，触发加载
+  const triggerDistance = 300;
+  const shouldLoad = rect.bottom <= viewportHeight + triggerDistance;
 
   // 调试信息
-  console.log('滚动检测:', {
-    scrollHeight,
-    scrollTop,
-    clientHeight,
-    触发位置: scrollHeight - 200,
-    当前位置: scrollTop + clientHeight,
-    差值: scrollHeight - 200 - (scrollTop + clientHeight),
-    事件来源: event ? event.target : 'manual'
+  console.log('无限滚动检查:', {
+    lastCardBottom: rect.bottom,
+    viewportHeight: viewportHeight,
+    triggerPoint: viewportHeight + triggerDistance,
+    shouldLoad: shouldLoad,
+    isLoadingMore: isLoadingMore,
+    hasMoreContent: hasMoreContent
   });
 
-  if (scrollTop + clientHeight >= scrollHeight - 200) {
-    console.log('触发加载更多内容');
+  if (shouldLoad) {
+    console.log('触发自动加载更多内容');
     loadMoreDoubanContent();
   }
 }
@@ -538,11 +442,6 @@ function renderDoubanCards(data, container) {
   // 清空并添加所有新元素
   container.innerHTML = "";
   container.appendChild(fragment);
-
-  // 重新创建滚动目标（延迟执行以确保DOM更新完成）
-  setTimeout(() => {
-    createScrollTarget();
-  }, 100);
 }
 
 // 追加豆瓣卡片（不清空现有内容）
@@ -573,40 +472,35 @@ function appendDoubanCards(data) {
     const proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
 
     card.innerHTML = `
-            <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                <img src="${originalCoverUrl}" alt="${safeTitle}" 
-                    class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                    onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
-                    loading="lazy" referrerpolicy="no-referrer">
-                <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
-                <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
-                    <span class="text-yellow-400">★</span> ${safeRate}
-                </div>
-                <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
-                    <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
-                        🔗
-                    </a>
-                </div>
-            </div>
-            <div class="p-2 text-center bg-[#111]">
-                <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
-                        class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
-                        title="${safeTitle}">
-                    ${safeTitle}
-                </button>
-            </div>
-        `;
+      <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
+        <img src="${originalCoverUrl}" alt="${safeTitle}" 
+          class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+          onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
+          loading="lazy" referrerpolicy="no-referrer">
+        <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
+        <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
+          <span class="text-yellow-400">★</span> ${safeRate}
+        </div>
+        <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
+            🔗
+          </a>
+        </div>
+      </div>
+      <div class="p-2 text-center bg-[#111]">
+        <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
+          class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
+          title="${safeTitle}">
+          ${safeTitle}
+        </button>
+      </div>
+    `;
 
     fragment.appendChild(card);
   });
 
   // 将新卡片追加到容器中
   container.appendChild(fragment);
-
-  // 重新创建滚动目标（延迟执行以确保DOM更新完成）
-  setTimeout(() => {
-    createScrollTarget();
-  }, 100);
 }
 
 // 根据设置更新豆瓣区域的显示状态
@@ -1229,96 +1123,4 @@ function resetTagsToDefault() {
   renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart, true);
 
   showToast('已恢复默认标签', 'success');
-}
-
-// 初始化iframe滚动通信机制
-function initIframeScrollCommunication() {
-  // 监听父页面发送的滚动消息
-  window.addEventListener('message', function (event) {
-    if (event.data && event.data.type === 'parentScroll') {
-      console.log('收到父页面滚动消息:', event.data);
-
-      // 检查是否需要加载更多内容
-      const doubanArea = document.getElementById('doubanArea');
-      if (doubanArea && !doubanArea.classList.contains('hidden')) {
-        // 模拟滚动检测
-        checkScrollPosition(event.data);
-      }
-    }
-  });
-
-  // 如果在iframe中，定期检查页面位置
-  if (window.parent !== window) {
-    console.log('检测到iframe环境，启动定期检查');
-
-    // 定期检查是否需要加载更多内容
-    setInterval(() => {
-      checkIfNeedMoreContent();
-    }, 1000);
-
-    // 向父页面发送准备就绪消息
-    try {
-      window.parent.postMessage({
-        type: 'iframeReady',
-        source: 'LibreTV'
-      }, '*');
-    } catch (e) {
-      console.log('无法向父页面发送消息');
-    }
-  }
-}
-
-// 检查滚动位置（基于父页面传递的信息）
-function checkScrollPosition(scrollData) {
-  if (isLoadingMore || !hasMoreContent) {
-    return;
-  }
-
-  const { scrollTop, windowHeight } = scrollData;
-
-  // 获取豆瓣区域的位置信息
-  const doubanArea = document.getElementById('doubanArea');
-  if (!doubanArea) return;
-
-  const rect = doubanArea.getBoundingClientRect();
-  const doubanBottom = rect.bottom + scrollTop;
-  const currentViewBottom = scrollTop + windowHeight;
-
-  console.log('iframe滚动检测:', {
-    doubanBottom,
-    currentViewBottom,
-    差值: doubanBottom - currentViewBottom,
-    需要触发: doubanBottom - currentViewBottom <= 200
-  });
-
-  // 如果距离豆瓣区域底部200px以内，触发加载
-  if (doubanBottom - currentViewBottom <= 200) {
-    console.log('通过iframe消息触发加载更多内容');
-    loadMoreDoubanContent();
-  }
-}
-
-// 定期检查是否需要更多内容（iframe环境备用方案）
-function checkIfNeedMoreContent() {
-  if (isLoadingMore || !hasMoreContent) {
-    return;
-  }
-
-  const doubanArea = document.getElementById('doubanArea');
-  if (!doubanArea || doubanArea.classList.contains('hidden')) {
-    return;
-  }
-
-  // 检查豆瓣内容区域是否在视窗内
-  const doubanResults = document.getElementById('douban-results');
-  if (!doubanResults) return;
-
-  const rect = doubanResults.getBoundingClientRect();
-  const viewportHeight = window.innerHeight;
-
-  // 如果内容区域的底部接近或在视窗底部
-  if (rect.bottom <= viewportHeight + 200) {
-    console.log('通过定期检查触发加载更多内容');
-    loadMoreDoubanContent();
-  }
 }
