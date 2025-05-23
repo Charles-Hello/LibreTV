@@ -1626,6 +1626,12 @@
 
     // 推送当前URL到服务器
     function pushCurrentUrl() {
+      // 先暂停视频播放
+      if (dp && dp.video && !dp.video.paused) {
+        dp.pause();
+        console.log('推送时暂停播放');
+      }
+
       // 获取当前URL
       const currentUrl = window.location.href;
 
