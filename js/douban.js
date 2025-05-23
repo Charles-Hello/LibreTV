@@ -121,6 +121,9 @@ function initDouban() {
   // 初始化无限滚动
   initInfiniteScroll();
 
+  // 初始化iframe通信机制
+  initIframeScrollCommunication();
+
   // 确保在DOM完全加载后添加滚动监听
   if (document.readyState === 'complete') {
     initInfiniteScroll();
@@ -1226,4 +1229,96 @@ function resetTagsToDefault() {
   renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart, true);
 
   showToast('已恢复默认标签', 'success');
+}
+
+// 初始化iframe滚动通信机制
+function initIframeScrollCommunication() {
+  // 监听父页面发送的滚动消息
+  window.addEventListener('message', function (event) {
+    if (event.data && event.data.type === 'parentScroll') {
+      console.log('收到父页面滚动消息:', event.data);
+
+      // 检查是否需要加载更多内容
+      const doubanArea = document.getElementById('doubanArea');
+      if (doubanArea && !doubanArea.classList.contains('hidden')) {
+        // 模拟滚动检测
+        checkScrollPosition(event.data);
+      }
+    }
+  });
+
+  // 如果在iframe中，定期检查页面位置
+  if (window.parent !== window) {
+    console.log('检测到iframe环境，启动定期检查');
+
+    // 定期检查是否需要加载更多内容
+    setInterval(() => {
+      checkIfNeedMoreContent();
+    }, 1000);
+
+    // 向父页面发送准备就绪消息
+    try {
+      window.parent.postMessage({
+        type: 'iframeReady',
+        source: 'LibreTV'
+      }, '*');
+    } catch (e) {
+      console.log('无法向父页面发送消息');
+    }
+  }
+}
+
+// 检查滚动位置（基于父页面传递的信息）
+function checkScrollPosition(scrollData) {
+  if (isLoadingMore || !hasMoreContent) {
+    return;
+  }
+
+  const { scrollTop, windowHeight } = scrollData;
+
+  // 获取豆瓣区域的位置信息
+  const doubanArea = document.getElementById('doubanArea');
+  if (!doubanArea) return;
+
+  const rect = doubanArea.getBoundingClientRect();
+  const doubanBottom = rect.bottom + scrollTop;
+  const currentViewBottom = scrollTop + windowHeight;
+
+  console.log('iframe滚动检测:', {
+    doubanBottom,
+    currentViewBottom,
+    差值: doubanBottom - currentViewBottom,
+    需要触发: doubanBottom - currentViewBottom <= 200
+  });
+
+  // 如果距离豆瓣区域底部200px以内，触发加载
+  if (doubanBottom - currentViewBottom <= 200) {
+    console.log('通过iframe消息触发加载更多内容');
+    loadMoreDoubanContent();
+  }
+}
+
+// 定期检查是否需要更多内容（iframe环境备用方案）
+function checkIfNeedMoreContent() {
+  if (isLoadingMore || !hasMoreContent) {
+    return;
+  }
+
+  const doubanArea = document.getElementById('doubanArea');
+  if (!doubanArea || doubanArea.classList.contains('hidden')) {
+    return;
+  }
+
+  // 检查豆瓣内容区域是否在视窗内
+  const doubanResults = document.getElementById('douban-results');
+  if (!doubanResults) return;
+
+  const rect = doubanResults.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
+
+  // 如果内容区域的底部接近或在视窗底部
+  if (rect.bottom <= viewportHeight + 200) {
+    console.log('通过定期检查触发加载更多内容');
+    loadMoreDoubanContent();
+  }
 }
