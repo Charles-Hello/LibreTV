@@ -56,6 +56,7 @@ const doubanPageSize = 16; // 一次显示的项目数量
 // 添加无限滚动相关变量
 let isLoadingMore = false; // 是否正在加载更多
 let hasMoreContent = true; // 是否还有更多内容
+let scrollObserver = null; // Intersection Observer实例
 
 // 初始化豆瓣功能
 function initDouban() {
@@ -132,9 +133,25 @@ function initDouban() {
 function initInfiniteScroll() {
   // 移除之前的滚动监听器（如果存在）
   window.removeEventListener('scroll', handleScroll);
+  document.removeEventListener('scroll', handleScroll);
 
-  // 添加新的滚动监听器
-  window.addEventListener('scroll', handleScroll);
+  // 添加新的滚动监听器 - 同时监听window和document
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  document.addEventListener('scroll', handleScroll, { passive: true });
+
+  // 如果在iframe中，也监听iframe的滚动
+  if (window.parent !== window) {
+    console.log('检测到iframe环境，添加iframe滚动监听');
+    try {
+      // 尝试监听父窗口的滚动（如果同源）
+      window.parent.addEventListener('scroll', handleScroll, { passive: true });
+    } catch (e) {
+      console.log('无法监听父窗口滚动（跨域限制）');
+    }
+  }
+
+  // 初始化Intersection Observer作为备用方案
+  initScrollObserver();
 
   // 调试信息
   console.log('已初始化无限滚动监听器');
@@ -146,8 +163,82 @@ function initInfiniteScroll() {
   }, 1000);
 }
 
+// 初始化滚动观察器（使用Intersection Observer）
+function initScrollObserver() {
+  // 如果浏览器不支持Intersection Observer，跳过
+  if (!window.IntersectionObserver) {
+    console.log('浏览器不支持Intersection Observer');
+    return;
+  }
+
+  // 清理之前的观察器
+  if (scrollObserver) {
+    scrollObserver.disconnect();
+  }
+
+  // 创建观察器
+  scrollObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        console.log('通过Intersection Observer检测到滚动到底部');
+        // 检查豆瓣区域是否可见且需要加载更多内容
+        const doubanArea = document.getElementById('doubanArea');
+        if (doubanArea && !doubanArea.classList.contains('hidden') &&
+          !isLoadingMore && hasMoreContent) {
+          loadMoreDoubanContent();
+        }
+      }
+    });
+  }, {
+    root: null, // 使用视窗作为根
+    rootMargin: '200px', // 提前200px触发
+    threshold: 0
+  });
+
+  // 创建观察目标元素
+  createScrollTarget();
+}
+
+// 创建滚动目标元素
+function createScrollTarget() {
+  // 移除之前的目标元素
+  const oldTarget = document.getElementById('scroll-target');
+  if (oldTarget) {
+    if (scrollObserver) {
+      scrollObserver.unobserve(oldTarget);
+    }
+    oldTarget.remove();
+  }
+
+  // 创建新的目标元素
+  const target = document.createElement('div');
+  target.id = 'scroll-target';
+  target.style.cssText = `
+    position: absolute;
+    bottom: 200px;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+    opacity: 0;
+  `;
+
+  // 将目标元素添加到豆瓣区域
+  const doubanArea = document.getElementById('doubanArea');
+  if (doubanArea) {
+    doubanArea.style.position = 'relative';
+    doubanArea.appendChild(target);
+
+    // 开始观察
+    if (scrollObserver) {
+      scrollObserver.observe(target);
+      console.log('已设置Intersection Observer目标元素');
+    }
+  }
+}
+
 // 处理滚动事件
-function handleScroll() {
+function handleScroll(event) {
   // 检查豆瓣区域是否可见
   const doubanArea = document.getElementById('doubanArea');
   if (!doubanArea || doubanArea.classList.contains('hidden')) {
@@ -159,13 +250,41 @@ function handleScroll() {
     return;
   }
 
+  // 获取滚动元素（优先使用事件目标，否则使用默认元素）
+  let scrollElement = document.documentElement;
+  let scrollContainer = window;
+
+  // 如果事件来自特定元素，使用该元素
+  if (event && event.target) {
+    if (event.target === document) {
+      scrollElement = document.documentElement;
+    } else if (event.target === window.parent) {
+      // 如果是父窗口滚动，需要特殊处理
+      try {
+        scrollElement = window.parent.document.documentElement;
+        scrollContainer = window.parent;
+      } catch (e) {
+        // 跨域情况下无法访问父窗口信息
+        return;
+      }
+    }
+  }
+
   // 检查是否滚动到接近底部（距离底部200px时开始加载）
-  const scrollHeight = document.documentElement.scrollHeight;
-  const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
-  const clientHeight = document.documentElement.clientHeight;
+  const scrollHeight = scrollElement.scrollHeight;
+  const scrollTop = scrollElement.scrollTop || document.body.scrollTop;
+  const clientHeight = scrollElement.clientHeight;
 
   // 调试信息
-  console.log('滚动位置:', scrollTop + clientHeight, '触发位置:', scrollHeight - 200, '差值:', scrollHeight - 200 - (scrollTop + clientHeight));
+  console.log('滚动检测:', {
+    scrollHeight,
+    scrollTop,
+    clientHeight,
+    触发位置: scrollHeight - 200,
+    当前位置: scrollTop + clientHeight,
+    差值: scrollHeight - 200 - (scrollTop + clientHeight),
+    事件来源: event ? event.target : 'manual'
+  });
 
   if (scrollTop + clientHeight >= scrollHeight - 200) {
     console.log('触发加载更多内容');
@@ -347,6 +466,82 @@ function hideLoadMoreIndicator() {
   }
 }
 
+// 抽取渲染豆瓣卡片的逻辑到单独函数
+function renderDoubanCards(data, container) {
+  // 创建文档片段以提高性能
+  const fragment = document.createDocumentFragment();
+
+  // 如果没有数据
+  if (!data.subjects || data.subjects.length === 0) {
+    const emptyEl = document.createElement("div");
+    emptyEl.className = "col-span-full text-center py-8";
+    emptyEl.innerHTML = `
+            <div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>
+        `;
+    fragment.appendChild(emptyEl);
+  } else {
+    // 循环创建每个影视卡片
+    data.subjects.forEach(item => {
+      const card = document.createElement("div");
+      card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
+
+      // 生成卡片内容，确保安全显示（防止XSS）
+      const safeTitle = item.title
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+      const safeRate = (item.rate || "暂无")
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // 处理图片URL
+      // 1. 直接使用豆瓣图片URL (添加no-referrer属性)
+      const originalCoverUrl = item.cover;
+
+      // 2. 也准备代理URL作为备选
+      const proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
+
+      // 为不同设备优化卡片布局
+      card.innerHTML = `
+                <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
+                    <img src="${originalCoverUrl}" alt="${safeTitle}" 
+                        class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                        onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
+                        loading="lazy" referrerpolicy="no-referrer">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
+                    <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
+                        <span class="text-yellow-400">★</span> ${safeRate}
+                    </div>
+                    <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
+                            🔗
+                        </a>
+                    </div>
+                </div>
+                <div class="p-2 text-center bg-[#111]">
+                    <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
+                            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
+                            title="${safeTitle}">
+                        ${safeTitle}
+                    </button>
+                </div>
+            `;
+
+      fragment.appendChild(card);
+    });
+  }
+
+  // 清空并添加所有新元素
+  container.innerHTML = "";
+  container.appendChild(fragment);
+
+  // 重新创建滚动目标（延迟执行以确保DOM更新完成）
+  setTimeout(() => {
+    createScrollTarget();
+  }, 100);
+}
+
 // 追加豆瓣卡片（不清空现有内容）
 function appendDoubanCards(data) {
   const container = document.getElementById("douban-results");
@@ -375,35 +570,40 @@ function appendDoubanCards(data) {
     const proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
 
     card.innerHTML = `
-      <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-        <img src="${originalCoverUrl}" alt="${safeTitle}" 
-          class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-          onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
-          loading="lazy" referrerpolicy="no-referrer">
-        <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
-        <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
-          <span class="text-yellow-400">★</span> ${safeRate}
-        </div>
-        <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
-          <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
-            🔗
-          </a>
-        </div>
-      </div>
-      <div class="p-2 text-center bg-[#111]">
-        <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
-          class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
-          title="${safeTitle}">
-          ${safeTitle}
-        </button>
-      </div>
-    `;
+            <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
+                <img src="${originalCoverUrl}" alt="${safeTitle}" 
+                    class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                    onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
+                    loading="lazy" referrerpolicy="no-referrer">
+                <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
+                <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
+                    <span class="text-yellow-400">★</span> ${safeRate}
+                </div>
+                <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
+                    <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
+                        🔗
+                    </a>
+                </div>
+            </div>
+            <div class="p-2 text-center bg-[#111]">
+                <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
+                        class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
+                        title="${safeTitle}">
+                    ${safeTitle}
+                </button>
+            </div>
+        `;
 
     fragment.appendChild(card);
   });
 
   // 将新卡片追加到容器中
   container.appendChild(fragment);
+
+  // 重新创建滚动目标（延迟执行以确保DOM更新完成）
+  setTimeout(() => {
+    createScrollTarget();
+  }, 100);
 }
 
 // 根据设置更新豆瓣区域的显示状态
@@ -795,77 +995,6 @@ async function fetchDoubanData(url) {
       throw fallbackErr; // 向上抛出错误，让调用者处理
     }
   }
-}
-
-// 抽取渲染豆瓣卡片的逻辑到单独函数
-function renderDoubanCards(data, container) {
-  // 创建文档片段以提高性能
-  const fragment = document.createDocumentFragment();
-
-  // 如果没有数据
-  if (!data.subjects || data.subjects.length === 0) {
-    const emptyEl = document.createElement("div");
-    emptyEl.className = "col-span-full text-center py-8";
-    emptyEl.innerHTML = `
-            <div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>
-        `;
-    fragment.appendChild(emptyEl);
-  } else {
-    // 循环创建每个影视卡片
-    data.subjects.forEach(item => {
-      const card = document.createElement("div");
-      card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
-
-      // 生成卡片内容，确保安全显示（防止XSS）
-      const safeTitle = item.title
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-
-      const safeRate = (item.rate || "暂无")
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-      // 处理图片URL
-      // 1. 直接使用豆瓣图片URL (添加no-referrer属性)
-      const originalCoverUrl = item.cover;
-
-      // 2. 也准备代理URL作为备选
-      const proxiedCoverUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
-
-      // 为不同设备优化卡片布局
-      card.innerHTML = `
-                <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${originalCoverUrl}" alt="${safeTitle}" 
-                        class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                        onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
-                        loading="lazy" referrerpolicy="no-referrer">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
-                    <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
-                        <span class="text-yellow-400">★</span> ${safeRate}
-                    </div>
-                    <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
-                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
-                            🔗
-                        </a>
-                    </div>
-                </div>
-                <div class="p-2 text-center bg-[#111]">
-                    <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
-                            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
-                            title="${safeTitle}">
-                        ${safeTitle}
-                    </button>
-                </div>
-            `;
-
-      fragment.appendChild(card);
-    });
-  }
-
-  // 清空并添加所有新元素
-  container.innerHTML = "";
-  container.appendChild(fragment);
 }
 
 // 重置到首页
