@@ -137,12 +137,83 @@ function initInfiniteScroll() {
     clearInterval(window.infiniteScrollInterval);
   }
 
-  // 使用定时器方案，更可靠
+  // 移除旧的事件监听器
+  document.removeEventListener('scroll', checkIfShouldLoadMore);
+  document.removeEventListener('wheel', checkIfShouldLoadMore);
+  document.removeEventListener('touchend', checkIfShouldLoadMore);
+  document.removeEventListener('mousemove', checkIfShouldLoadMore);
+  document.removeEventListener('click', checkIfShouldLoadMore);
+
+  // 添加多种事件监听器来检测用户活动
+  document.addEventListener('scroll', checkIfShouldLoadMore, { passive: true });
+  document.addEventListener('wheel', checkIfShouldLoadMore, { passive: true });
+  document.addEventListener('touchend', checkIfShouldLoadMore, { passive: true });
+  document.addEventListener('mousemove', throttle(checkIfShouldLoadMore, 1000), { passive: true });
+  document.addEventListener('click', checkIfShouldLoadMore, { passive: true });
+
+  // 保持定时器作为备用
   window.infiniteScrollInterval = setInterval(() => {
     checkIfShouldLoadMore();
-  }, 500); // 每500ms检查一次
+  }, 2000); // 每2秒检查一次
 
-  console.log('已启动定时器检查无限滚动');
+  // 添加更频繁的检查当用户在豆瓣区域时
+  setupDoubanAreaWatcher();
+
+  console.log('已启动多重触发机制的无限滚动');
+}
+
+// 节流函数
+function throttle(func, delay) {
+  let timeoutId;
+  let lastExecTime = 0;
+  return function (...args) {
+    const currentTime = Date.now();
+
+    if (currentTime - lastExecTime > delay) {
+      func.apply(this, args);
+      lastExecTime = currentTime;
+    } else {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+        lastExecTime = Date.now();
+      }, delay - (currentTime - lastExecTime));
+    }
+  };
+}
+
+// 设置豆瓣区域监视器
+function setupDoubanAreaWatcher() {
+  const doubanArea = document.getElementById('doubanArea');
+  if (!doubanArea) return;
+
+  // 当鼠标进入豆瓣区域时，启动更频繁的检查
+  let quickCheckInterval;
+
+  doubanArea.addEventListener('mouseenter', () => {
+    console.log('鼠标进入豆瓣区域，启动快速检查');
+    if (quickCheckInterval) clearInterval(quickCheckInterval);
+    quickCheckInterval = setInterval(() => {
+      checkIfShouldLoadMore();
+    }, 200); // 每200ms检查一次
+  });
+
+  doubanArea.addEventListener('mouseleave', () => {
+    console.log('鼠标离开豆瓣区域，停止快速检查');
+    if (quickCheckInterval) {
+      clearInterval(quickCheckInterval);
+      quickCheckInterval = null;
+    }
+  });
+
+  // 添加触摸事件支持
+  doubanArea.addEventListener('touchstart', () => {
+    setTimeout(checkIfShouldLoadMore, 500);
+  }, { passive: true });
+
+  doubanArea.addEventListener('touchmove', throttle(() => {
+    checkIfShouldLoadMore();
+  }, 500), { passive: true });
 }
 
 // 检查是否应该加载更多内容
@@ -169,32 +240,64 @@ function checkIfShouldLoadMore() {
     return;
   }
 
-  // 获取最后一个电影卡片
-  const lastCard = doubanResults.lastElementChild;
+  // 检查豆瓣区域是否在用户视窗内
+  const doubanRect = doubanArea.getBoundingClientRect();
+  const windowHeight = window.innerHeight;
+
+  // 如果豆瓣区域不在视窗内，不检查
+  if (doubanRect.bottom < 0 || doubanRect.top > windowHeight) {
+    return;
+  }
+
+  // 获取最后几个电影卡片
+  const cards = doubanResults.children;
+  const lastCard = cards[cards.length - 1];
+  const secondLastCard = cards.length > 1 ? cards[cards.length - 2] : null;
+
   if (!lastCard) {
     return;
   }
 
   // 获取最后一个卡片的位置信息
-  const rect = lastCard.getBoundingClientRect();
-  const viewportHeight = window.innerHeight;
+  const lastCardRect = lastCard.getBoundingClientRect();
 
-  // 如果最后一个卡片进入视窗底部300px范围内，触发加载
-  const triggerDistance = 300;
-  const shouldLoad = rect.bottom <= viewportHeight + triggerDistance;
+  // 多种触发条件：
+  // 1. 最后一个卡片进入视窗
+  // 2. 最后一个卡片距离视窗底部较近
+  // 3. 倒数第二个卡片完全可见
 
-  // 调试信息
-  console.log('无限滚动检查:', {
-    lastCardBottom: rect.bottom,
-    viewportHeight: viewportHeight,
-    triggerPoint: viewportHeight + triggerDistance,
-    shouldLoad: shouldLoad,
-    isLoadingMore: isLoadingMore,
-    hasMoreContent: hasMoreContent
-  });
+  const triggerDistance = 500; // 增加到500px
+  const condition1 = lastCardRect.top < windowHeight + triggerDistance;
+  const condition2 = lastCardRect.bottom <= windowHeight + triggerDistance;
+
+  let condition3 = false;
+  if (secondLastCard) {
+    const secondLastRect = secondLastCard.getBoundingClientRect();
+    condition3 = secondLastRect.bottom <= windowHeight;
+  }
+
+  const shouldLoad = condition1 || condition2 || condition3;
+
+  // 调试信息（每10次输出一次，避免刷屏）
+  if (!window.debugCounter) window.debugCounter = 0;
+  if (window.debugCounter % 10 === 0) {
+    console.log('无限滚动检查:', {
+      doubanInView: `top:${doubanRect.top.toFixed(0)}, bottom:${doubanRect.bottom.toFixed(0)}`,
+      lastCardTop: lastCardRect.top.toFixed(0),
+      lastCardBottom: lastCardRect.bottom.toFixed(0),
+      windowHeight: windowHeight,
+      triggerPoint: windowHeight + triggerDistance,
+      condition1: condition1,
+      condition2: condition2,
+      condition3: condition3,
+      shouldLoad: shouldLoad,
+      cardsCount: cards.length
+    });
+  }
+  window.debugCounter++;
 
   if (shouldLoad) {
-    console.log('触发自动加载更多内容');
+    console.log('🎯 触发自动加载更多内容！');
     loadMoreDoubanContent();
   }
 }
@@ -354,13 +457,29 @@ function showLoadMoreIndicator(message, isError = false) {
     doubanContainer.appendChild(indicator);
   }
 
-  indicator.className = `text-center py-4 text-sm ${isError ? 'text-red-400' : 'text-gray-400'}`;
-  indicator.innerHTML = isError ?
-    `<div class="text-red-400">${message}</div>` :
-    `<div class="flex items-center justify-center">
-      <div class="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-      <span class="text-pink-500">${message}</span>
-    </div>`;
+  if (isError) {
+    indicator.className = `text-center py-4 text-sm text-red-400`;
+    indicator.innerHTML = `
+        <div class="text-red-400 mb-2">${message}</div>
+        <button onclick="loadMoreDoubanContent()" 
+                class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded text-sm">
+            手动加载更多
+        </button>
+    `;
+  } else {
+    indicator.className = `text-center py-4 text-sm text-gray-400`;
+    indicator.innerHTML = `
+        <div class="flex items-center justify-center mb-2">
+            <div class="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+            <span class="text-pink-500">${message}</span>
+        </div>
+        <div class="text-xs text-gray-500">如果加载时间过长，可以</div>
+        <button onclick="loadMoreDoubanContent()" 
+                class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs mt-1">
+            手动重试
+        </button>
+    `;
+  }
 
   indicator.style.display = 'block';
 }
@@ -383,8 +502,8 @@ function renderDoubanCards(data, container) {
     const emptyEl = document.createElement("div");
     emptyEl.className = "col-span-full text-center py-8";
     emptyEl.innerHTML = `
-            <div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>
-        `;
+        <div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>
+    `;
     fragment.appendChild(emptyEl);
   } else {
     // 循环创建每个影视卡片
@@ -411,29 +530,29 @@ function renderDoubanCards(data, container) {
 
       // 为不同设备优化卡片布局
       card.innerHTML = `
-                <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${originalCoverUrl}" alt="${safeTitle}" 
-                        class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                        onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
-                        loading="lazy" referrerpolicy="no-referrer">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
-                    <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
-                        <span class="text-yellow-400">★</span> ${safeRate}
-                    </div>
-                    <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
-                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
-                            🔗
-                        </a>
-                    </div>
-                </div>
-                <div class="p-2 text-center bg-[#111]">
-                    <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
-                            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
-                            title="${safeTitle}">
-                        ${safeTitle}
-                    </button>
-                </div>
-            `;
+        <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
+          <img src="${originalCoverUrl}" alt="${safeTitle}" 
+            class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+            onerror="this.onerror=null; this.src='${proxiedCoverUrl}'; this.classList.add('object-contain');"
+            loading="lazy" referrerpolicy="no-referrer">
+          <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
+          <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
+            <span class="text-yellow-400">★</span> ${safeRate}
+          </div>
+          <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
+            <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看">
+              🔗
+            </a>
+          </div>
+        </div>
+        <div class="p-2 text-center bg-[#111]">
+          <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
+            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
+            title="${safeTitle}">
+            ${safeTitle}
+          </button>
+        </div>
+      `;
 
       fragment.appendChild(card);
     });
@@ -442,6 +561,11 @@ function renderDoubanCards(data, container) {
   // 清空并添加所有新元素
   container.innerHTML = "";
   container.appendChild(fragment);
+
+  // 检查内容是否足够填满屏幕
+  setTimeout(() => {
+    checkContentHeight();
+  }, 500);
 }
 
 // 追加豆瓣卡片（不清空现有内容）
@@ -501,6 +625,34 @@ function appendDoubanCards(data) {
 
   // 将新卡片追加到容器中
   container.appendChild(fragment);
+
+  // 检查内容是否足够
+  setTimeout(() => {
+    checkContentHeight();
+  }, 500);
+}
+
+// 检查内容高度，如果不足则自动加载更多
+function checkContentHeight() {
+  const doubanArea = document.getElementById('doubanArea');
+  const doubanResults = document.getElementById('douban-results');
+
+  if (!doubanArea || !doubanResults || isLoadingMore || !hasMoreContent) {
+    return;
+  }
+
+  if (doubanArea.classList.contains('hidden')) {
+    return;
+  }
+
+  const doubanRect = doubanArea.getBoundingClientRect();
+  const windowHeight = window.innerHeight;
+
+  // 如果豆瓣区域的底部在视窗内，说明内容可能不够
+  if (doubanRect.bottom < windowHeight * 1.5) {
+    console.log('🔄 内容不足，自动加载更多');
+    loadMoreDoubanContent();
+  }
 }
 
 // 根据设置更新豆瓣区域的显示状态
