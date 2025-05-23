@@ -230,36 +230,35 @@
     <div class="flex-1 flex flex-col">
       <!-- 网站标志和口号 -->
       <header class="text-center mb-2">
-        <div class="flex justify-center items-center mb-4">
+        <div class="flex justify-center items-center mb-3">
           <a href="#" onclick="resetToHome(); return false;" class="flex items-center">
-            <svg class="w-10 h-10 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
               </path>
             </svg>
-            <h1 class="text-5xl font-bold gradient-text">LibreTV</h1>
+            <h1 class="text-3xl font-bold gradient-text">LibreTV</h1>
           </a>
         </div>
-        <p class="text-gray-400 mb-8">自由观影，畅享精彩</p>
       </header>
 
 
       <div id="searchArea" class="flex-1 flex flex-col items-center justify-center">
         <div class="w-full max-w-2xl">
-          <div class="flex items-stretch mb-3 h-14 shadow-lg rounded-lg overflow-hidden">
+          <div class="flex items-stretch mb-3 h-14 shadow-lg rounded-lg overflow-hidden search-container">
             <!-- 首页按钮 -->
             <button onclick="resetToHome()"
-              class="w-20 sm:w-24 flex items-center justify-center bg-white text-black font-medium hover:bg-gray-200 transition-colors"
+              class="w-20 sm:w-24 flex items-center justify-center bg-gradient-to-r from-[#00ccff] to-[#0099cc] text-white font-medium hover:from-[#0099cc] hover:to-[#00ccff] transition-all duration-300"
               aria-label="返回首页" title="返回首页">
               首页
             </button>
             <!-- 搜索输入 -->
             <input type="text" id="searchInput"
-              class="flex-1 bg-[#111] border-y border-[#333] text-white px-6 py-0 focus:outline-none transition-colors"
+              class="flex-1 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] border-y-0 text-white px-6 py-0 focus:outline-none focus:bg-gradient-to-r focus:from-[#16213e] focus:to-[#1a1a2e] transition-all duration-300 placeholder-gray-400"
               placeholder="搜索你喜欢的视频..." autocomplete="off" aria-label="视频搜索框">
             <!-- 搜索按钮 -->
             <button onclick="search()"
-              class="w-20 sm:w-24 flex items-center justify-center bg-white text-black font-medium hover:bg-gray-200 transition-colors"
+              class="w-20 sm:w-24 flex items-center justify-center bg-gradient-to-r from-[#ff3c78] to-[#cc1e5a] text-white font-medium hover:from-[#cc1e5a] hover:to-[#ff3c78] transition-all duration-300"
               aria-label="搜索按钮">
               搜索
             </button>

@@ -1,0 +1,17 @@
+{
+  "watch": [
+    "server.mjs",
+    "index.html",
+    "player.html",
+    "js/",
+    "css/",
+    "api/"
+  ],
+  "ext": "mjs,js,html,css,json",
+  "ignore": [
+    "node_modules/",
+    ".git/"
+  ],
+  "delay": "500",
+  "verbose": true
+}

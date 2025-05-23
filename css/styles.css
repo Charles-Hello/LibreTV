@@ -877,3 +877,48 @@ body {
 .card-hover .p-2 {
     padding: 0.5rem;
 }
+
+/* 搜索框增强样式 */
+#searchInput {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 204, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+#searchInput:focus {
+    background: linear-gradient(135deg, #16213e, #1a1a2e);
+    border-color: rgba(0, 204, 255, 0.5);
+    box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+}
+
+#searchInput:hover {
+    border-color: rgba(0, 204, 255, 0.3);
+}
+
+/* 搜索按钮增强样式 */
+.search-container {
+    background: linear-gradient(135deg, rgba(17, 17, 17, 0.95), rgba(34, 34, 34, 0.95));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 204, 255, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.search-container:hover {
+    border-color: rgba(0, 204, 255, 0.4);
+    box-shadow: 0 6px 25px rgba(0, 204, 255, 0.2);
+}
+
+/* 按钮悬停发光效果 */
+button[onclick="search()"] {
+    position: relative;
+    overflow: hidden;
+}
+
+button[onclick="search()"]:hover {
+    box-shadow: 0 0 20px rgba(255, 60, 120, 0.4);
+}
+
+button[onclick="resetToHome()"]:hover {
+    box-shadow: 0 0 20px rgba(0, 204, 255, 0.4);
+}
