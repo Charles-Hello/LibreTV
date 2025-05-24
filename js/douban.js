@@ -142,36 +142,36 @@ function initInfiniteScroll() {
   window.addEventListener('scroll', handleScroll, { passive: true });
   document.addEventListener('scroll', handleScroll, { passive: true });
 
-  // 如果在iframe中，添加必要的滚动监听
-  if (isInIframe) {
-    document.body.addEventListener('scroll', handleScroll, { passive: true });
-    document.documentElement.addEventListener('scroll', handleScroll, { passive: true });
+  // // 如果在iframe中，添加必要的滚动监听
+  // if (isInIframe) {
+  //   document.body.addEventListener('scroll', handleScroll, { passive: true });
+  //   document.documentElement.addEventListener('scroll', handleScroll, { passive: true });
 
-    // 监听来自父页面的消息（保留消息监听，但不自动触发检查）
-    window.addEventListener('message', function (event) {
-      if (event.data && event.data.type === 'TEST_SCROLL') {
-        console.log('收到父页面滚动测试消息:', event.data);
-        // 只在收到明确指令时检查
-        handleScroll();
-      }
+  //   // 监听来自父页面的消息（保留消息监听，但不自动触发检查）
+  //   window.addEventListener('message', function (event) {
+  //     if (event.data && event.data.type === 'TEST_SCROLL') {
+  //       console.log('收到父页面滚动测试消息:', event.data);
+  //       // 只在收到明确指令时检查
+  //       handleScroll();
+  //     }
 
-      if (event.data && event.data.type === 'FORCE_SCROLL_CHECK') {
-        console.log('收到强制滚动检查消息:', event.data);
-        // 强制检查滚动状态
-        forceScrollCheck();
-      }
-    });
+  //     if (event.data && event.data.type === 'FORCE_SCROLL_CHECK') {
+  //       console.log('收到强制滚动检查消息:', event.data);
+  //       // 强制检查滚动状态
+  //       forceScrollCheck();
+  //     }
+  //   });
 
-    // 向父页面发送消息表示iframe已加载
-    try {
-      window.parent.postMessage({
-        type: 'IFRAME_LOADED',
-        message: 'LibreTV iframe已加载完成'
-      }, '*');
-    } catch (e) {
-      console.log('无法向父页面发送消息:', e);
-    }
-  }
+  //   // 向父页面发送消息表示iframe已加载
+  //   try {
+  //     window.parent.postMessage({
+  //       type: 'IFRAME_LOADED',
+  //       message: 'LibreTV iframe已加载完成'
+  //     }, '*');
+  //   } catch (e) {
+  //     console.log('无法向父页面发送消息:', e);
+  //   }
+  // }
 
   // 调试信息
   console.log('已初始化滚动监听器（仅手动滚动触发）');
