@@ -812,6 +812,23 @@ body {
     display: inline;
 }
 
+/* 头部按钮组样式 */
+.header-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* 返回按钮特殊样式 */
+button[onclick="goBack()"] {
+    background: linear-gradient(135deg, #6b7280, #4b5563) !important;
+}
+
+button[onclick="goBack()"]:hover {
+    background: linear-gradient(135deg, #4b5563, #374151) !important;
+    transform: scale(1.05);
+}
+
 @media (max-width: 640px) {
     .logo-text {
         display: none;
@@ -825,6 +842,22 @@ body {
     }
     .custom-title-scroll {
         font-size: 1rem;
+    }
+    
+    /* 移动端按钮文字隐藏 */
+    .home-btn-text {
+        display: none;
+    }
+    
+    /* 移动端按钮间距调整 */
+    .header-buttons {
+        gap: 0.25rem;
+    }
+    
+    /* 移动端返回按钮优化 */
+    button[onclick="goBack()"] {
+        padding: 0.5rem !important;
+        min-width: auto;
     }
 }
 

@@ -110,6 +110,16 @@
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
 
+    /* 返回按钮特殊样式 */
+    button[onclick="goBack()"] {
+      background: linear-gradient(135deg, #6b7280, #4b5563) !important;
+    }
+
+    button[onclick="goBack()"]:hover {
+      background: linear-gradient(135deg, #4b5563, #374151) !important;
+      transform: scale(1.05);
+    }
+
     .episode-grid {
       max-height: 30vh;
       overflow-y: auto;
@@ -207,35 +217,38 @@
 <body>
   <header class="bg-[#111] p-4 flex items-center border-b border-[#333] gap-2 player-header">
     <div class="flex items-center min-w-0">
-      <a href="/" class="flex items-center min-w-0">
-        <svg class="w-8 h-8 mr-2 text-[#00ccff] logo-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
-          </path>
+      <button onclick="goBack()" title="返回上一页"
+        class="px-2 py-2 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5" />
+          <path d="M12 19l-7-7 7-7" />
         </svg>
-        <h1 class="text-xl font-bold gradient-text logo-text">LibreTV</h1>
-      </a>
+        <span class="home-btn-text text-xs sm:text-sm">返回</span>
+      </button>
     </div>
     <h2 id="videoTitle"
       class="text-xl font-semibold flex-1 text-center overflow-x-auto whitespace-nowrap truncate custom-title-scroll">
     </h2>
-    <button id="pushButton" onclick="pushCurrentUrl()" title="推送到其他设备"
-      class="mr-2 px-2 py-2 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 sm:gap-2">
-      <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>
-      <span class="text-xs sm:text-sm">推送</span>
-    </button>
-    <a href="/"
-      class="px-2 py-2 sm:px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center min-w-0 home-btn gap-1">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M19 21V9.5l-7-5-7 5V21a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2z" />
-        <path d="M9 22V12h6v10" />
-      </svg>
-      <span class="home-btn-text text-xs sm:text-sm">首页</span>
-    </a>
+    <div class="header-buttons">
+      <button id="pushButton" onclick="pushCurrentUrl()" title="推送到其他设备"
+        class="px-2 py-2 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 sm:gap-2">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <span class="text-xs sm:text-sm">推送</span>
+      </button>
+      <a href="/"
+        class="px-2 py-2 sm:px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center min-w-0 home-btn gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21V9.5l-7-5-7 5V21a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2z" />
+          <path d="M9 22V12h6v10" />
+        </svg>
+        <span class="home-btn-text text-xs sm:text-sm">首页</span>
+      </a>
+    </div>
   </header>
 
   <!-- 密码验证弹窗 -->
@@ -1725,6 +1738,21 @@
         iconSingle.innerHTML = controlsLocked
           ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M12 15v2m0-8V7a4 4 0 00-8 0v2m8 0H4v8h16v-8h-4z\"/>'
           : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M15 11V7a3 3 0 00-6 0v4m-3 4h12v6H6v-6z\"/>';
+      }
+    }
+
+    // 返回上一页功能
+    function goBack() {
+      // 保存当前播放进度
+      saveCurrentProgress();
+
+      // 检查是否有历史记录可以返回
+      if (window.history.length > 1) {
+        // 使用浏览器历史记录返回
+        window.history.back();
+      } else {
+        // 如果没有历史记录，返回首页
+        window.location.href = '/';
       }
     }
 
