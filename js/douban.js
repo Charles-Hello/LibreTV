@@ -138,26 +138,26 @@ function initInfiniteScroll() {
   const isInIframe = window.self !== window.top;
   console.log('是否在iframe中:', isInIframe);
 
-  // 添加多个滚动监听器以确保兼容性
+  // 只添加真正的滚动监听器
   window.addEventListener('scroll', handleScroll, { passive: true });
   document.addEventListener('scroll', handleScroll, { passive: true });
 
-  // 如果在iframe中，还需要监听document body的滚动
+  // 如果在iframe中，添加必要的滚动监听
   if (isInIframe) {
     document.body.addEventListener('scroll', handleScroll, { passive: true });
     document.documentElement.addEventListener('scroll', handleScroll, { passive: true });
 
-    // 监听来自父页面的消息
+    // 监听来自父页面的消息（保留消息监听，但不自动触发检查）
     window.addEventListener('message', function (event) {
       if (event.data && event.data.type === 'TEST_SCROLL') {
         console.log('收到父页面滚动测试消息:', event.data);
-        // 主动检查一次滚动状态
+        // 只在收到明确指令时检查
         handleScroll();
       }
 
       if (event.data && event.data.type === 'FORCE_SCROLL_CHECK') {
         console.log('收到强制滚动检查消息:', event.data);
-        // 强制检查滚动状态，不管其他条件
+        // 强制检查滚动状态
         forceScrollCheck();
       }
     });
@@ -171,80 +171,10 @@ function initInfiniteScroll() {
     } catch (e) {
       console.log('无法向父页面发送消息:', e);
     }
-
-    // 添加更多的事件监听器以捕获各种滚动情况
-    ['wheel', 'touchmove', 'keydown'].forEach(eventType => {
-      document.addEventListener(eventType, function () {
-        // 延迟检查滚动状态，确保DOM已更新
-        setTimeout(handleScroll, 100);
-      }, { passive: true });
-    });
-
-    // 监听窗口大小变化，可能会影响滚动检测
-    window.addEventListener('resize', function () {
-      setTimeout(handleScroll, 200);
-    });
-
-    // 添加观察者模式，监听DOM变化
-    if (window.MutationObserver) {
-      const observer = new MutationObserver(function (mutations) {
-        let shouldCheck = false;
-        mutations.forEach(function (mutation) {
-          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            shouldCheck = true;
-          }
-        });
-        if (shouldCheck) {
-          setTimeout(handleScroll, 300);
-        }
-      });
-
-      // 观察豆瓣结果容器的变化
-      const doubanResults = document.getElementById('douban-results');
-      if (doubanResults) {
-        observer.observe(doubanResults, {
-          childList: true,
-          subtree: true
-        });
-      }
-    }
   }
 
   // 调试信息
-  console.log('已初始化无限滚动监听器');
-
-  // 初始检查是否需要加载更多（针对内容不足一屏的情况）
-  setTimeout(() => {
-    console.log('初始检查是否需要加载更多');
-    handleScroll();
-  }, 2000); // 增加延迟确保DOM完全渲染
-
-  // 定期检查滚动状态（作为备用方案）
-  setInterval(() => {
-    if (isInIframe) {
-      handleScroll();
-    }
-  }, 5000); // 每5秒检查一次
-
-  // 在iframe环境中添加更频繁的检查
-  if (isInIframe) {
-    // 前30秒内更频繁地检查（页面可能还在加载内容）
-    let quickCheckCount = 0;
-    const quickCheckInterval = setInterval(() => {
-      handleScroll();
-      quickCheckCount++;
-      if (quickCheckCount >= 10) { // 10次后停止快速检查
-        clearInterval(quickCheckInterval);
-      }
-    }, 3000); // 每3秒检查一次
-
-    // 监听用户交互事件，交互后检查滚动
-    ['click', 'touchstart', 'keydown'].forEach(eventType => {
-      document.addEventListener(eventType, function () {
-        setTimeout(handleScroll, 500);
-      }, { passive: true });
-    });
-  }
+  console.log('已初始化滚动监听器（仅手动滚动触发）');
 }
 
 // 处理滚动事件
@@ -263,7 +193,7 @@ function handleScroll() {
   // 检查是否在iframe中
   const isInIframe = window.self !== window.top;
 
-  // 获取多种滚动位置和高度信息，以应对不同的iframe环境
+  // 获取滚动位置和高度信息
   let scrollHeight, scrollTop, clientHeight;
 
   if (isInIframe) {
@@ -272,9 +202,7 @@ function handleScroll() {
       document.documentElement.scrollHeight,
       document.body.scrollHeight,
       document.documentElement.offsetHeight,
-      document.body.offsetHeight,
-      window.innerHeight + document.documentElement.scrollTop,
-      window.innerHeight + document.body.scrollTop
+      document.body.offsetHeight
     );
 
     scrollTop = Math.max(
@@ -289,21 +217,6 @@ function handleScroll() {
       document.body.clientHeight,
       window.innerHeight || 0
     );
-
-    // 特殊处理：在某些iframe环境中，尝试获取豆瓣结果容器的位置信息
-    const doubanResults = document.getElementById('douban-results');
-    if (doubanResults) {
-      const resultsRect = doubanResults.getBoundingClientRect();
-      const containerBottom = resultsRect.bottom;
-      const viewportHeight = window.innerHeight;
-
-      // 如果豆瓣结果容器的底部接近视窗底部，触发加载
-      if (containerBottom <= viewportHeight + 300) {
-        console.log('通过容器位置检测触发加载更多');
-        loadMoreDoubanContent();
-        return;
-      }
-    }
   } else {
     // 非iframe环境，使用标准方法
     scrollHeight = Math.max(
@@ -327,36 +240,14 @@ function handleScroll() {
 
   // 调试信息
   console.log('滚动检查 - iframe模式:', isInIframe, '高度:', scrollHeight, '滚动位置:', scrollTop, '视窗高度:', clientHeight);
-  console.log('当前位置:', scrollTop + clientHeight, '触发位置:', scrollHeight - 300);
+  console.log('当前位置:', scrollTop + clientHeight, '触发位置:', scrollHeight - 100);
 
-  // 在iframe中使用更宽松的触发条件
-  const triggerThreshold = isInIframe ? 500 : 300;
+  // 只有真正滚动到接近底部时才触发加载（使用更保守的阈值）
+  const triggerThreshold = 100; // 统一使用100px的阈值，不区分iframe
 
-  // 降低触发阈值以便更容易触发
   if (scrollTop + clientHeight >= scrollHeight - triggerThreshold) {
-    console.log('触发加载更多内容');
+    console.log('用户滚动到底部，触发加载更多内容');
     loadMoreDoubanContent();
-    return;
-  }
-
-  // 额外检查：如果内容高度不足，也尝试加载
-  const minHeightThreshold = isInIframe ? 200 : 100;
-  if (scrollHeight <= clientHeight + minHeightThreshold && hasMoreContent) {
-    console.log('内容不足一屏，自动加载更多');
-    loadMoreDoubanContent();
-    return;
-  }
-
-  // 在iframe环境中，添加基于页面可见区域的检测
-  if (isInIframe) {
-    const bodyHeight = document.body.offsetHeight;
-    const windowHeight = window.innerHeight;
-
-    // 如果页面内容高度小于窗口高度的1.5倍，认为需要更多内容
-    if (bodyHeight < windowHeight * 1.5 && hasMoreContent) {
-      console.log('iframe环境检测到内容不足，触发加载');
-      loadMoreDoubanContent();
-    }
   }
 }
 
@@ -1320,7 +1211,7 @@ function resetTagsToDefault() {
   showToast('已恢复默认标签', 'success');
 }
 
-// 强制滚动检查（忽略加载状态和内容状态）
+// 强制滚动检查（仅在明确需要时触发）
 function forceScrollCheck() {
   console.log('执行强制滚动检查');
 
@@ -1361,32 +1252,20 @@ function forceScrollCheck() {
 
   console.log('容器高度:', containerHeight, '视窗高度:', viewportHeight, '文档高度:', documentHeight);
 
-  // 多种触发条件
+  // 只有在明确需要时才加载（更保守的条件）
   let shouldLoad = false;
 
-  // 条件1：内容不足一屏
-  if (containerHeight < viewportHeight * 1.2) {
-    console.log('内容高度不足，触发加载');
+  // 条件1：卡片数量为0（初始状态）
+  if (currentCards === 0) {
+    console.log('没有内容，触发初始加载');
     shouldLoad = true;
   }
 
-  // 条件2：卡片数量较少
-  if (currentCards < 8) {
-    console.log('卡片数量不足，触发加载');
-    shouldLoad = true;
-  }
-
-  // 条件3：使用 getBoundingClientRect 检查容器位置
+  // 条件2：使用 getBoundingClientRect 检查是否真的滚动到底部
   const rect = doubanResults.getBoundingClientRect();
   const containerBottom = rect.bottom;
-  if (containerBottom <= viewportHeight + 200) {
+  if (containerBottom <= viewportHeight + 50) { // 更严格的阈值
     console.log('容器底部接近视窗底部，触发加载');
-    shouldLoad = true;
-  }
-
-  // 条件4：文档高度接近视窗高度
-  if (documentHeight <= viewportHeight + 100) {
-    console.log('文档高度不足，触发加载');
     shouldLoad = true;
   }
 
