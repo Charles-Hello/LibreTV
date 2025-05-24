@@ -92,8 +92,22 @@
     }
 
     .episode-active {
-      background-color: #3b82f6 !important;
-      border-color: #60a5fa !important;
+      background: linear-gradient(to right, #06b6d4, #2563eb) !important;
+      color: white !important;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* 按钮禁用状态样式 */
+    button:disabled {
+      pointer-events: none;
+      transform: none !important;
+    }
+
+    /* 按钮悬停效果增强 */
+    .home-btn:hover,
+    #prevButton:not(:disabled):hover,
+    #nextButton:not(:disabled):hover {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
 
     .episode-grid {
@@ -206,21 +220,21 @@
       class="text-xl font-semibold flex-1 text-center overflow-x-auto whitespace-nowrap truncate custom-title-scroll">
     </h2>
     <button id="pushButton" onclick="pushCurrentUrl()" title="推送到其他设备"
-      class="mr-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      class="mr-2 px-2 py-2 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 sm:gap-2">
+      <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
       </svg>
-      <span class="hidden sm:inline">推送</span>
+      <span class="text-xs sm:text-sm">推送</span>
     </button>
     <a href="/"
-      class="px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded-lg transition-colors flex items-center min-w-0 home-btn">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      class="px-2 py-2 sm:px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center min-w-0 home-btn gap-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M19 21V9.5l-7-5-7 5V21a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2z" />
         <path d="M9 22V12h6v10" />
       </svg>
-      <span class="home-btn-text">返回首页</span>
+      <span class="home-btn-text text-xs sm:text-sm">首页</span>
     </a>
   </header>
 
@@ -268,17 +282,17 @@
     <div class="player-container">
       <div class="flex justify-between items-center my-4">
         <button onclick="playPreviousEpisode()" id="prevButton"
-          class="px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded-lg transition-colors">
-          <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          class="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-1 sm:gap-2">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
           </svg>
-          上一集
+          <span class="text-sm sm:text-base">上一集</span>
         </button>
         <span class="text-gray-400" id="episodeInfo">加载中...</span>
         <button onclick="playNextEpisode()" id="nextButton"
-          class="px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded-lg transition-colors">
-          下一集
-          <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          class="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-1 sm:gap-2">
+          <span class="text-sm sm:text-base">下一集</span>
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </button>
@@ -1028,23 +1042,23 @@
 
       // 处理上一集按钮
       if (currentEpisodeIndex > 0) {
-        prevButton.classList.remove('bg-gray-700', 'cursor-not-allowed');
-        prevButton.classList.add('bg-[#222]', 'hover:bg-[#333]');
+        prevButton.classList.remove('bg-gray-600', 'cursor-not-allowed', 'opacity-50', 'transform-none');
+        prevButton.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-purple-600', 'hover:from-blue-600', 'hover:to-purple-700', 'hover:scale-105');
         prevButton.removeAttribute('disabled');
       } else {
-        prevButton.classList.add('bg-gray-700', 'cursor-not-allowed');
-        prevButton.classList.remove('bg-[#222]', 'hover:bg-[#333]');
+        prevButton.classList.add('bg-gray-600', 'cursor-not-allowed', 'opacity-50', 'transform-none');
+        prevButton.classList.remove('bg-gradient-to-r', 'from-blue-500', 'to-purple-600', 'hover:from-blue-600', 'hover:to-purple-700', 'hover:scale-105');
         prevButton.setAttribute('disabled', '');
       }
 
       // 处理下一集按钮
       if (currentEpisodeIndex < currentEpisodes.length - 1) {
-        nextButton.classList.remove('bg-gray-700', 'cursor-not-allowed');
-        nextButton.classList.add('bg-[#222]', 'hover:bg-[#333]');
+        nextButton.classList.remove('bg-gray-600', 'cursor-not-allowed', 'opacity-50', 'transform-none');
+        nextButton.classList.add('bg-gradient-to-r', 'from-orange-500', 'to-red-600', 'hover:from-orange-600', 'hover:to-red-700', 'hover:scale-105');
         nextButton.removeAttribute('disabled');
       } else {
-        nextButton.classList.add('bg-gray-700', 'cursor-not-allowed');
-        nextButton.classList.remove('bg-[#222]', 'hover:bg-[#333]');
+        nextButton.classList.add('bg-gray-600', 'cursor-not-allowed', 'opacity-50', 'transform-none');
+        nextButton.classList.remove('bg-gradient-to-r', 'from-orange-500', 'to-red-600', 'hover:from-orange-600', 'hover:to-red-700', 'hover:scale-105');
         nextButton.setAttribute('disabled', '');
       }
     }
@@ -1070,7 +1084,7 @@
         html += `
                     <button id="episode-${realIndex}" 
                             onclick="playEpisode(${realIndex})" 
-                            class="px-4 py-2 ${isActive ? 'episode-active' : 'bg-[#222] hover:bg-[#333]'} border ${isActive ? 'border-blue-500' : 'border-[#333]'} rounded-lg transition-colors text-center episode-btn">
+                            class="px-4 py-2 ${isActive ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg' : 'bg-slate-700 hover:bg-slate-600 text-gray-200'} rounded-lg transition-all duration-300 hover:shadow-lg transform hover:scale-105 text-center episode-btn font-medium">
                         第${realIndex + 1}集
                     </button>
                 `;

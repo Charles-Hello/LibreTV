@@ -793,17 +793,12 @@ body {
 .home-btn-text {
     display: inline;
 }
+
 @media (max-width: 640px) {
     .logo-text {
         display: none;
     }
-    .home-btn-text {
-        display: none;
-    }
     .logo-icon {
-        margin-right: 0;
-    }
-    .home-btn svg {
         margin-right: 0;
     }
     .player-header {
