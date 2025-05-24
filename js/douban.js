@@ -142,36 +142,7 @@ function initInfiniteScroll() {
   window.addEventListener('scroll', handleScroll, { passive: true });
   document.addEventListener('scroll', handleScroll, { passive: true });
 
-  // // 如果在iframe中，添加必要的滚动监听
-  // if (isInIframe) {
-  //   document.body.addEventListener('scroll', handleScroll, { passive: true });
-  //   document.documentElement.addEventListener('scroll', handleScroll, { passive: true });
 
-  //   // 监听来自父页面的消息（保留消息监听，但不自动触发检查）
-  //   window.addEventListener('message', function (event) {
-  //     if (event.data && event.data.type === 'TEST_SCROLL') {
-  //       console.log('收到父页面滚动测试消息:', event.data);
-  //       // 只在收到明确指令时检查
-  //       handleScroll();
-  //     }
-
-  //     if (event.data && event.data.type === 'FORCE_SCROLL_CHECK') {
-  //       console.log('收到强制滚动检查消息:', event.data);
-  //       // 强制检查滚动状态
-  //       forceScrollCheck();
-  //     }
-  //   });
-
-  //   // 向父页面发送消息表示iframe已加载
-  //   try {
-  //     window.parent.postMessage({
-  //       type: 'IFRAME_LOADED',
-  //       message: 'LibreTV iframe已加载完成'
-  //     }, '*');
-  //   } catch (e) {
-  //     console.log('无法向父页面发送消息:', e);
-  //   }
-  // }
 
   // 调试信息
   console.log('已初始化滚动监听器（仅手动滚动触发）');
@@ -193,60 +164,60 @@ function handleScroll() {
   // 检查是否在iframe中
   const isInIframe = window.self !== window.top;
 
-  // 获取滚动位置和高度信息
-  let scrollHeight, scrollTop, clientHeight;
-
+  // 在iframe环境中使用更精确的检测方法
   if (isInIframe) {
-    // 在iframe中，尝试获取多种高度和滚动位置
-    scrollHeight = Math.max(
-      document.documentElement.scrollHeight,
-      document.body.scrollHeight,
-      document.documentElement.offsetHeight,
-      document.body.offsetHeight
-    );
+    // 获取豆瓣结果容器
+    const doubanResults = document.getElementById('douban-results');
+    if (!doubanResults) {
+      return;
+    }
 
-    scrollTop = Math.max(
-      document.documentElement.scrollTop,
-      document.body.scrollTop,
-      window.pageYOffset || 0,
-      window.scrollY || 0
-    );
+    // 使用 getBoundingClientRect 获取精确位置
+    const rect = doubanResults.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
 
-    clientHeight = Math.max(
-      document.documentElement.clientHeight,
-      document.body.clientHeight,
-      window.innerHeight || 0
-    );
-  } else {
-    // 非iframe环境，使用标准方法
-    scrollHeight = Math.max(
-      document.documentElement.scrollHeight,
-      document.body.scrollHeight,
-      document.documentElement.offsetHeight,
-      document.body.offsetHeight
-    );
+    // 容器底部距离视窗底部的距离
+    const distanceToBottom = rect.bottom - viewportHeight;
 
-    scrollTop = Math.max(
-      document.documentElement.scrollTop,
-      document.body.scrollTop,
-      window.pageYOffset || 0
-    );
+    console.log('iframe滚动检测 - 容器底部:', rect.bottom, '视窗高度:', viewportHeight, '距离底部:', distanceToBottom);
 
-    clientHeight = Math.max(
-      document.documentElement.clientHeight,
-      window.innerHeight || 0
-    );
+    // 只有当容器底部真正接近或超出视窗底部时才触发（更严格的条件）
+    if (distanceToBottom <= 50) { // 50px的严格阈值
+      console.log('iframe环境：用户滚动到底部，触发加载更多内容');
+      loadMoreDoubanContent();
+    }
+
+    return; // iframe环境直接返回，不使用下面的通用检测
   }
 
+  // 非iframe环境，使用标准的滚动检测
+  const scrollHeight = Math.max(
+    document.documentElement.scrollHeight,
+    document.body.scrollHeight,
+    document.documentElement.offsetHeight,
+    document.body.offsetHeight
+  );
+
+  const scrollTop = Math.max(
+    document.documentElement.scrollTop,
+    document.body.scrollTop,
+    window.pageYOffset || 0
+  );
+
+  const clientHeight = Math.max(
+    document.documentElement.clientHeight,
+    window.innerHeight || 0
+  );
+
   // 调试信息
-  console.log('滚动检查 - iframe模式:', isInIframe, '高度:', scrollHeight, '滚动位置:', scrollTop, '视窗高度:', clientHeight);
+  console.log('标准滚动检测 - 高度:', scrollHeight, '滚动位置:', scrollTop, '视窗高度:', clientHeight);
   console.log('当前位置:', scrollTop + clientHeight, '触发位置:', scrollHeight - 100);
 
-  // 只有真正滚动到接近底部时才触发加载（使用更保守的阈值）
-  const triggerThreshold = 100; // 统一使用100px的阈值，不区分iframe
+  // 只有真正滚动到接近底部时才触发加载
+  const triggerThreshold = 100;
 
   if (scrollTop + clientHeight >= scrollHeight - triggerThreshold) {
-    console.log('用户滚动到底部，触发加载更多内容');
+    console.log('标准环境：用户滚动到底部，触发加载更多内容');
     loadMoreDoubanContent();
   }
 }
@@ -1245,12 +1216,8 @@ function forceScrollCheck() {
   const currentCards = doubanResults.children.length;
   console.log('当前卡片数量:', currentCards);
 
-  // 检查容器高度和视窗高度
-  const containerHeight = doubanResults.offsetHeight;
-  const viewportHeight = window.innerHeight;
-  const documentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
-
-  console.log('容器高度:', containerHeight, '视窗高度:', viewportHeight, '文档高度:', documentHeight);
+  // 检查是否在iframe中
+  const isInIframe = window.self !== window.top;
 
   // 只有在明确需要时才加载（更保守的条件）
   let shouldLoad = false;
@@ -1259,14 +1226,33 @@ function forceScrollCheck() {
   if (currentCards === 0) {
     console.log('没有内容，触发初始加载');
     shouldLoad = true;
-  }
+  } else if (isInIframe) {
+    // iframe环境：使用精确的位置检测
+    const rect = doubanResults.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const distanceToBottom = rect.bottom - viewportHeight;
 
-  // 条件2：使用 getBoundingClientRect 检查是否真的滚动到底部
-  const rect = doubanResults.getBoundingClientRect();
-  const containerBottom = rect.bottom;
-  if (containerBottom <= viewportHeight + 50) { // 更严格的阈值
-    console.log('容器底部接近视窗底部，触发加载');
-    shouldLoad = true;
+    console.log('强制检查 - iframe环境 - 容器底部:', rect.bottom, '视窗高度:', viewportHeight, '距离底部:', distanceToBottom);
+
+    if (distanceToBottom <= 30) { // 更严格的30px阈值
+      console.log('iframe环境：容器底部接近视窗底部，触发加载');
+      shouldLoad = true;
+    }
+  } else {
+    // 非iframe环境：使用标准检测
+    const containerHeight = doubanResults.offsetHeight;
+    const viewportHeight = window.innerHeight;
+    const documentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+
+    console.log('强制检查 - 标准环境 - 容器高度:', containerHeight, '视窗高度:', viewportHeight, '文档高度:', documentHeight);
+
+    // 使用 getBoundingClientRect 检查是否真的滚动到底部
+    const rect = doubanResults.getBoundingClientRect();
+    const containerBottom = rect.bottom;
+    if (containerBottom <= viewportHeight + 30) { // 30px的严格阈值
+      console.log('标准环境：容器底部接近视窗底部，触发加载');
+      shouldLoad = true;
+    }
   }
 
   if (shouldLoad) {
@@ -1277,13 +1263,14 @@ function forceScrollCheck() {
 
     // 向父页面发送状态消息
     try {
-      window.parent.postMessage({
-        type: 'SCROLL_STATUS',
-        needMore: false,
-        currentCards: currentCards,
-        containerHeight: containerHeight,
-        viewportHeight: viewportHeight
-      }, '*');
+      if (isInIframe) {
+        window.parent.postMessage({
+          type: 'SCROLL_STATUS',
+          needMore: false,
+          currentCards: currentCards,
+          isInIframe: true
+        }, '*');
+      }
     } catch (e) {
       console.log('无法向父页面发送状态消息:', e);
     }
