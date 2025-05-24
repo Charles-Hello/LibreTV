@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // 默认选中过滤开关
     localStorage.setItem('yellowFilterEnabled', 'true');
     localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, 'true');
+    localStorage.setItem('qualityFilterEnabled', 'true');
 
     // 默认启用豆瓣功能
     localStorage.setItem('doubanEnabled', 'true');
@@ -46,6 +47,12 @@ document.addEventListener('DOMContentLoaded', function () {
   const yellowFilterToggle = document.getElementById('yellowFilterToggle');
   if (yellowFilterToggle) {
     yellowFilterToggle.checked = localStorage.getItem('yellowFilterEnabled') === 'true';
+  }
+
+  // 设置质量内容过滤开关初始状态
+  const qualityFilterToggle = document.getElementById('qualityFilterToggle');
+  if (qualityFilterToggle) {
+    qualityFilterToggle.checked = localStorage.getItem('qualityFilterEnabled') !== 'false'; // 默认为true
   }
 
   // 设置广告过滤开关初始状态
@@ -560,6 +567,14 @@ function setupEventListeners() {
     });
   }
 
+  // 质量内容过滤开关事件绑定
+  const qualityFilterToggle = document.getElementById('qualityFilterToggle');
+  if (qualityFilterToggle) {
+    qualityFilterToggle.addEventListener('change', function (e) {
+      localStorage.setItem('qualityFilterEnabled', e.target.checked);
+    });
+  }
+
   // 广告过滤开关事件绑定
   const adFilterToggle = document.getElementById('adFilterToggle');
   if (adFilterToggle) {
@@ -695,12 +710,6 @@ async function search() {
       }
     });
 
-    // 更新搜索结果计数
-    const searchResultsCount = document.getElementById('searchResultsCount');
-    if (searchResultsCount) {
-      searchResultsCount.textContent = allResults.length;
-    }
-
     // 显示结果区域，调整搜索区域
     document.getElementById('searchArea').classList.remove('flex-1');
     document.getElementById('searchArea').classList.add('mb-8');
@@ -726,18 +735,62 @@ async function search() {
                     <p class="mt-1 text-sm text-gray-500">请尝试其他关键词或更换数据源</p>
                 </div>
             `;
+      // 更新搜索结果计数为0
+      const searchResultsCount = document.getElementById('searchResultsCount');
+      if (searchResultsCount) {
+        searchResultsCount.textContent = '0';
+      }
       hideLoading();
       return;
     }
 
-    // 处理搜索结果过滤：如果启用了黄色内容过滤，则过滤掉分类含有敏感内容的项目
+    // 处理搜索结果过滤
     const yellowFilterEnabled = localStorage.getItem('yellowFilterEnabled') === 'true';
+    const qualityFilterEnabled = localStorage.getItem('qualityFilterEnabled') !== 'false'; // 默认启用
+
+    // 黄色内容过滤
     if (yellowFilterEnabled) {
-      const banned = ['伦理片', '福利', '里番动漫', '门事件', '萝莉少女', '制服诱惑', '国产传媒', 'cosplay', '黑丝诱惑', '无码', '日本无码', '有码', '日本有码', 'SWAG', '网红主播', '色情片', '同性片', '福利视频', '福利片'];
       allResults = allResults.filter(item => {
         const typeName = item.type_name || '';
-        return !banned.some(keyword => typeName.includes(keyword));
+        return !FILTER_CONFIG.adultContent.some(keyword => typeName.includes(keyword));
       });
+    }
+
+    // 质量内容过滤（预告片、解说等）
+    if (qualityFilterEnabled) {
+      allResults = allResults.filter(item => {
+        const vodName = item.vod_name || '';
+        const typeName = item.type_name || '';
+        const remarks = item.vod_remarks || '';
+
+        // 检查标题、类型和备注中是否包含低质量关键词
+        const contentToCheck = `${vodName} ${typeName} ${remarks}`.toLowerCase();
+        return !FILTER_CONFIG.lowQualityContent.some(keyword =>
+          contentToCheck.includes(keyword.toLowerCase())
+        );
+      });
+    }
+
+    // 在过滤后更新搜索结果计数
+    const searchResultsCount = document.getElementById('searchResultsCount');
+    if (searchResultsCount) {
+      searchResultsCount.textContent = allResults.length;
+    }
+
+    // 如果过滤后没有结果
+    if (allResults.length === 0) {
+      resultsDiv.innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 class="mt-2 text-lg font-medium text-gray-400">所有结果都被过滤了</h3>
+                    <p class="mt-1 text-sm text-gray-500">请尝试关闭一些过滤选项或使用其他关键词</p>
+                </div>
+            `;
+      hideLoading();
+      return;
     }
 
     // 添加XSS保护，使用textContent和属性转义
@@ -1179,3 +1232,4 @@ if (config.auth.enabled) {
 
 // 或者针对特定路由
 app.use('/api', authMiddleware);
+
