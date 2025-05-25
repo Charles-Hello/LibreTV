@@ -475,6 +475,22 @@
     // PASSWORD 变量将在这里被服务器端注入
     window.__ENV__.PASSWORD = "{{PASSWORD}}";
   </script>
+
+  <!-- 监听来自iframe的消息 -->
+  <script>
+    window.addEventListener('message', function (event) {
+      // 验证消息来源和类型
+      if (event.data && event.data.type === 'goBack' && event.data.source === 'libretv-player') {
+        // 处理返回请求
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          // 如果没有历史记录，可以执行其他操作
+          console.log('收到iframe返回请求，但没有历史记录可返回');
+        }
+      }
+    });
+  </script>
 </body>
 
 </html>

@@ -1746,6 +1746,56 @@
       // 保存当前播放进度
       saveCurrentProgress();
 
+      // 检查是否在iframe中
+      const isInIframe = window.self !== window.top;
+
+      if (isInIframe) {
+        // 在iframe中的处理逻辑
+        try {
+          // 尝试通知父页面返回
+          if (window.parent && window.parent.postMessage) {
+            window.parent.postMessage({
+              type: 'goBack',
+              source: 'libretv-player'
+            }, '*');
+
+            // 等待一段时间，如果父页面没有响应，则使用备用方案
+            setTimeout(() => {
+              handleIframeBackup();
+            }, 500);
+          } else {
+            handleIframeBackup();
+          }
+        } catch (e) {
+          console.warn('无法与父页面通信:', e);
+          handleIframeBackup();
+        }
+      } else {
+        // 不在iframe中的正常处理
+        handleNormalBack();
+      }
+    }
+
+    // 处理iframe中的备用返回方案
+    function handleIframeBackup() {
+      // 尝试从URL参数中获取来源页面
+      const urlParams = new URLSearchParams(window.location.search);
+      const referrer = urlParams.get('referrer') || urlParams.get('from');
+
+      if (referrer) {
+        // 如果有来源页面参数，跳转到该页面
+        window.location.href = decodeURIComponent(referrer);
+      } else if (document.referrer && document.referrer !== window.location.href) {
+        // 尝试使用document.referrer
+        window.location.href = document.referrer;
+      } else {
+        // 最后的备用方案：返回首页
+        window.location.href = '/';
+      }
+    }
+
+    // 处理正常环境下的返回
+    function handleNormalBack() {
       // 检查是否有历史记录可以返回
       if (window.history.length > 1) {
         // 使用浏览器历史记录返回

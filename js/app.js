@@ -962,7 +962,7 @@ async function showDetails(id, vod_name, sourceCode) {
         }
 
         // 构建播放页面URL，传递必要参数
-        const playerUrl = `player.html?url=${encodeURIComponent(safeEpisodes[0])}&title=${encodeURIComponent(videoTitle)}&index=0&source=${encodeURIComponent(sourceName)}&source_code=${encodeURIComponent(sourceCode)}`;
+        const playerUrl = `player.html?url=${encodeURIComponent(safeEpisodes[0])}&title=${encodeURIComponent(videoTitle)}&index=0&source=${encodeURIComponent(sourceName)}&source_code=${encodeURIComponent(sourceCode)}&referrer=${encodeURIComponent(window.location.href)}`;
 
         // 直接跳转到播放页面
         window.location.href = playerUrl;
@@ -1074,7 +1074,7 @@ function playVideo(url, vod_name, sourceCode, episodeIndex = 0) {
   }
 
   // 构建播放页面URL，传递必要参数
-  const playerUrl = `player.html?url=${encodeURIComponent(url)}&title=${encodeURIComponent(videoTitle)}&index=${episodeIndex}&source=${encodeURIComponent(sourceName)}&source_code=${encodeURIComponent(sourceCode)}`;
+  const playerUrl = `player.html?url=${encodeURIComponent(url)}&title=${encodeURIComponent(videoTitle)}&index=${episodeIndex}&source=${encodeURIComponent(sourceName)}&source_code=${encodeURIComponent(sourceCode)}&referrer=${encodeURIComponent(window.location.href)}`;
 
   // 在当前标签页中打开播放页面
   window.location.href = playerUrl;
