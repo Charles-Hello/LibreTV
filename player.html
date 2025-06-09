@@ -1836,39 +1836,121 @@
 
       // 服务器地址
       const serverUrl = "https://tv.tnanko.top/send-url";
+      const esp32KeyUrl = "https://tv.tnanko.top/send-esp32-key?key_code=F";
 
       // 显示加载提示
       showToast("正在推送URL...", "info");
 
+      // 发送URL推送请求
+      sendUrlRequest(serverUrl, urlToSend, 0);
+      
+      // 发送ESP32按键请求
+      sendEsp32KeyRequest(esp32KeyUrl, 0);
+    }
+
+    // 发送URL推送请求的函数，支持重试
+    function sendUrlRequest(serverUrl, urlToSend, retryCount) {
+      const maxRetries = 5;
+      
       // 使用隐藏的iframe方式发送请求，避免CORS限制
-      const iframeId = "pushIframe" + new Date().getTime();
+      const iframeId = "pushIframe" + new Date().getTime() + "_" + retryCount;
       const iframe = document.createElement('iframe');
       iframe.id = iframeId;
       iframe.style.display = 'none';
 
       // 设置超时处理
       const timeoutId = setTimeout(function () {
-        showToast("推送超时，请重试", "error");
-        if (document.getElementById(iframeId)) {
-          document.body.removeChild(iframe);
+        if (retryCount < maxRetries) {
+          console.log(`URL推送超时，正在重试 (${retryCount + 1}/${maxRetries})`);
+          if (document.getElementById(iframeId)) {
+            document.body.removeChild(iframe);
+          }
+          // 重试
+          sendUrlRequest(serverUrl, urlToSend, retryCount + 1);
+        } else {
+          showToast("URL推送超时，已达到最大重试次数", "error");
+          if (document.getElementById(iframeId)) {
+            document.body.removeChild(iframe);
+          }
         }
       }, 10000); // 10秒超时
 
       // 加载完成或出错时的处理
       iframe.onload = function () {
         clearTimeout(timeoutId);
-        showToast("推送成功！", "success");
+        showToast("URL推送成功！", "success");
         document.body.removeChild(iframe);
       };
 
       iframe.onerror = function () {
         clearTimeout(timeoutId);
-        showToast("推送失败，请重试", "error");
-        document.body.removeChild(iframe);
+        if (retryCount < maxRetries) {
+          console.log(`URL推送失败，正在重试 (${retryCount + 1}/${maxRetries})`);
+          document.body.removeChild(iframe);
+          // 重试
+          sendUrlRequest(serverUrl, urlToSend, retryCount + 1);
+        } else {
+          showToast("URL推送失败，已达到最大重试次数", "error");
+          document.body.removeChild(iframe);
+        }
       };
 
       // 设置iframe的src为服务器URL
       iframe.src = `${serverUrl}?url=${encodeURIComponent(urlToSend)}`;
+
+      // 添加到文档中
+      document.body.appendChild(iframe);
+    }
+
+    // 发送ESP32按键请求的函数，支持重试
+    function sendEsp32KeyRequest(esp32KeyUrl, retryCount) {
+      const maxRetries = 5;
+      
+      // 使用隐藏的iframe方式发送请求，避免CORS限制
+      const iframeId = "esp32Iframe" + new Date().getTime() + "_" + retryCount;
+      const iframe = document.createElement('iframe');
+      iframe.id = iframeId;
+      iframe.style.display = 'none';
+
+      // 设置超时处理
+      const timeoutId = setTimeout(function () {
+        if (retryCount < maxRetries) {
+          console.log(`ESP32按键推送超时，正在重试 (${retryCount + 1}/${maxRetries})`);
+          if (document.getElementById(iframeId)) {
+            document.body.removeChild(iframe);
+          }
+          // 重试
+          sendEsp32KeyRequest(esp32KeyUrl, retryCount + 1);
+        } else {
+          console.log("ESP32按键推送超时，已达到最大重试次数");
+          if (document.getElementById(iframeId)) {
+            document.body.removeChild(iframe);
+          }
+        }
+      }, 10000); // 10秒超时
+
+      // 加载完成或出错时的处理
+      iframe.onload = function () {
+        clearTimeout(timeoutId);
+        console.log("ESP32按键推送成功");
+        document.body.removeChild(iframe);
+      };
+
+      iframe.onerror = function () {
+        clearTimeout(timeoutId);
+        if (retryCount < maxRetries) {
+          console.log(`ESP32按键推送失败，正在重试 (${retryCount + 1}/${maxRetries})`);
+          document.body.removeChild(iframe);
+          // 重试
+          sendEsp32KeyRequest(esp32KeyUrl, retryCount + 1);
+        } else {
+          console.log("ESP32按键推送失败，已达到最大重试次数");
+          document.body.removeChild(iframe);
+        }
+      };
+
+      // 设置iframe的src为ESP32按键URL
+      iframe.src = esp32KeyUrl;
 
       // 添加到文档中
       document.body.appendChild(iframe);
