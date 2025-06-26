@@ -744,17 +744,17 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'none';
 
-                // 电脑端自动全屏
-                if (isDesktopDevice && dp && !dp.fullScreen.isFullScreen()) {
-                  setTimeout(() => {
-                    try {
-                      dp.fullScreen.request();
-                      console.log('电脑端自动进入全屏模式');
-                    } catch (e) {
-                      console.warn('自动全屏失败:', e);
-                    }
-                  }, 1000); // 延迟1秒确保播放器完全加载
-                }
+              //   // 电脑端自动全屏
+              //   if (isDesktopDevice && dp && !dp.fullScreen.isFullScreen()) {
+              //     setTimeout(() => {
+              //       try {
+              //         // dp.fullScreen.request();
+              //         // console.log('电脑端自动进入全屏模式');
+              //       } catch (e) {
+              //         // console.warn('自动全屏失败:', e);
+              //       }
+              //     }, 1000); // 延迟1秒确保播放器完全加载
+              //   }
               });
 
               // 监听视频进度事件
