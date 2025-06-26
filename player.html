@@ -1844,10 +1844,10 @@
       // 发送URL推送请求
       sendUrlRequest(serverUrl, urlToSend, 0);
       
-      // 间隔10秒后发送ESP32按键请求
-      setTimeout(() => {
-        sendEsp32KeyRequest(esp32KeyUrl, 0);
-      }, 6000);
+      // // 间隔10秒后发送ESP32按键请求
+      // setTimeout(() => {
+      //   sendEsp32KeyRequest(esp32KeyUrl, 0);
+      // }, 6000);
     }
 
     // 发送URL推送请求的函数，支持重试
