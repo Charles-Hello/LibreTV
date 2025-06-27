@@ -461,6 +461,7 @@
       });
 
       // 优先使用URL传递的集数信息，否则从localStorage获取
+      let needToFetchEpisodes = false;
       try {
         if (episodesList) {
           // 如果URL中有集数数据，优先使用它
@@ -470,6 +471,12 @@
           // 否则从localStorage获取
           currentEpisodes = JSON.parse(localStorage.getItem('currentEpisodes') || '[]');
           console.log('从localStorage恢复集数信息:', currentEpisodes.length);
+
+          // 如果localStorage中也没有集数信息，且有视频标题和源代码，则尝试获取
+          if (currentEpisodes.length === 0 && title && sourceCode) {
+            needToFetchEpisodes = true;
+            console.log('需要通过API获取集数信息');
+          }
         }
 
         // 检查集数索引是否有效，如果无效则调整为0
@@ -498,6 +505,27 @@
         currentEpisodes = [];
         currentEpisodeIndex = 0;
         episodesReversed = false;
+        needToFetchEpisodes = true;
+      }
+
+      // 如果需要获取集数信息，尝试通过API获取
+      if (needToFetchEpisodes) {
+        fetchEpisodesInfo(title, sourceCode).then(episodes => {
+          if (episodes && episodes.length > 0) {
+            currentEpisodes = episodes;
+            console.log('成功获取集数信息:', currentEpisodes.length);
+
+            // 保存到localStorage
+            localStorage.setItem('currentEpisodes', JSON.stringify(currentEpisodes));
+
+            // 重新更新UI
+            updateEpisodeInfo();
+            renderEpisodes();
+            updateButtonStates();
+          }
+        }).catch(error => {
+          console.error('获取集数信息失败:', error);
+        });
       }
 
       // 设置页面标题
@@ -744,17 +772,17 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'none';
 
-              //   // 电脑端自动全屏
-              //   if (isDesktopDevice && dp && !dp.fullScreen.isFullScreen()) {
-              //     setTimeout(() => {
-              //       try {
-              //         // dp.fullScreen.request();
-              //         // console.log('电脑端自动进入全屏模式');
-              //       } catch (e) {
-              //         // console.warn('自动全屏失败:', e);
-              //       }
-              //     }, 1000); // 延迟1秒确保播放器完全加载
-              //   }
+                //   // 电脑端自动全屏
+                //   if (isDesktopDevice && dp && !dp.fullScreen.isFullScreen()) {
+                //     setTimeout(() => {
+                //       try {
+                //         // dp.fullScreen.request();
+                //         // console.log('电脑端自动进入全屏模式');
+                //       } catch (e) {
+                //         // console.warn('自动全屏失败:', e);
+                //       }
+                //     }, 1000); // 延迟1秒确保播放器完全加载
+                //   }
               });
 
               // 监听视频进度事件
@@ -1843,7 +1871,7 @@
 
       // 发送URL推送请求
       sendUrlRequest(serverUrl, urlToSend, 0);
-      
+
       // // 间隔10秒后发送ESP32按键请求
       // setTimeout(() => {
       //   sendEsp32KeyRequest(esp32KeyUrl, 0);
@@ -1853,7 +1881,7 @@
     // 发送URL推送请求的函数，支持重试
     function sendUrlRequest(serverUrl, urlToSend, retryCount) {
       const maxRetries = 5;
-      
+
       // 使用隐藏的iframe方式发送请求，避免CORS限制
       const iframeId = "pushIframe" + new Date().getTime() + "_" + retryCount;
       const iframe = document.createElement('iframe');
@@ -1907,7 +1935,7 @@
     // 发送ESP32按键请求的函数，支持重试
     function sendEsp32KeyRequest(esp32KeyUrl, retryCount) {
       const maxRetries = 5;
-      
+
       // 使用隐藏的iframe方式发送请求，避免CORS限制
       const iframeId = "esp32Iframe" + new Date().getTime() + "_" + retryCount;
       const iframe = document.createElement('iframe');
@@ -1956,6 +1984,82 @@
 
       // 添加到文档中
       document.body.appendChild(iframe);
+    }
+
+    // 获取集数信息的函数
+    async function fetchEpisodesInfo(title, sourceCode) {
+      if (!title || !sourceCode) {
+        console.log('缺少必要参数，无法获取集数信息');
+        return [];
+      }
+
+      try {
+        console.log(`尝试获取 "${title}" 的集数信息，来源: ${sourceCode}`);
+
+        // 首先尝试搜索视频以获取ID
+        let searchParams = '';
+        if (sourceCode.startsWith('custom_')) {
+          const customIndex = sourceCode.replace('custom_', '');
+          // 获取自定义API信息
+          const customApis = JSON.parse(localStorage.getItem('customApis') || '[]');
+          if (customApis[customIndex]) {
+            searchParams = '&customApi=' + encodeURIComponent(customApis[customIndex].url) + '&source=custom';
+          }
+        } else {
+          searchParams = '&source=' + sourceCode;
+        }
+
+        const searchUrl = `/api/search?keyword=${encodeURIComponent(title)}${searchParams}`;
+        const searchResponse = await fetch(searchUrl);
+        const searchData = await searchResponse.json();
+
+        if (!searchData.results || searchData.results.length === 0) {
+          console.log('搜索结果为空，无法获取集数信息');
+          return [];
+        }
+
+        // 查找最匹配的结果（标题完全匹配优先）
+        let targetResult = null;
+        for (const result of searchData.results) {
+          if (result.vod_name === title) {
+            targetResult = result;
+            break;
+          }
+        }
+
+        // 如果没有完全匹配的，使用第一个结果
+        if (!targetResult) {
+          targetResult = searchData.results[0];
+          console.log(`未找到完全匹配的结果，使用第一个结果: ${targetResult.vod_name}`);
+        }
+
+        // 获取详情信息
+        let detailParams = '';
+        if (sourceCode.startsWith('custom_')) {
+          const customIndex = sourceCode.replace('custom_', '');
+          const customApis = JSON.parse(localStorage.getItem('customApis') || '[]');
+          if (customApis[customIndex]) {
+            detailParams = '&customApi=' + encodeURIComponent(customApis[customIndex].url) + '&source=custom';
+          }
+        } else {
+          detailParams = '&source=' + sourceCode;
+        }
+
+        const detailUrl = `/api/detail?id=${encodeURIComponent(targetResult.vod_id)}${detailParams}`;
+        const detailResponse = await fetch(detailUrl);
+        const detailData = await detailResponse.json();
+
+        if (detailData.episodes && detailData.episodes.length > 0) {
+          console.log(`成功获取 "${title}" 的集数信息，共 ${detailData.episodes.length} 集`);
+          return detailData.episodes;
+        } else {
+          console.log('详情中没有找到集数信息');
+          return [];
+        }
+      } catch (error) {
+        console.error('获取集数信息时发生错误:', error);
+        return [];
+      }
     }
   </script>
 </body>
