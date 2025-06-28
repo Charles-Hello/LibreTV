@@ -385,6 +385,7 @@
   <script src="libs/DPlayer.min.js" crossorigin="anonymous"></script>
 
   <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
   <script src="js/password.js"></script>
   <script src="push_url.js"></script>
 
@@ -442,6 +443,8 @@
       const sourceCode = urlParams.get('source_code');
       let index = parseInt(urlParams.get('index') || '0');
       const episodesList = urlParams.get('episodes'); // 新增：从URL获取集数信息
+      const vodId = urlParams.get('vod_id'); // 新增：从URL获取vod_id
+      const apiParams = urlParams.get('api_params'); // 新增：从URL获取api_params
 
       // 从localStorage获取数据
       currentVideoTitle = title || localStorage.getItem('currentVideoTitle') || '未知视频';
@@ -468,14 +471,24 @@
           currentEpisodes = JSON.parse(decodeURIComponent(episodesList));
           console.log('从URL恢复集数信息:', currentEpisodes.length);
         } else {
-          // 否则从localStorage获取
-          currentEpisodes = JSON.parse(localStorage.getItem('currentEpisodes') || '[]');
-          console.log('从localStorage恢复集数信息:', currentEpisodes.length);
+          // 否则从localStorage获取（在非无痕模式下）
+          try {
+            currentEpisodes = JSON.parse(localStorage.getItem('currentEpisodes') || '[]');
+            console.log('从localStorage恢复集数信息:', currentEpisodes.length);
+          } catch (e) {
+            console.warn('localStorage不可用（可能是无痕模式），跳过localStorage读取');
+            currentEpisodes = [];
+          }
 
-          // 如果localStorage中也没有集数信息，且有视频标题和源代码，则尝试获取
+          // 如果没有集数信息，且有必要的参数，则尝试获取
           if (currentEpisodes.length === 0 && title && sourceCode) {
             needToFetchEpisodes = true;
             console.log('需要通过API获取集数信息');
+
+            // 如果有vod_id和api_params，优先使用它们
+            if (vodId && apiParams) {
+              console.log('检测到URL中有vod_id和api_params，将优先使用');
+            }
           }
         }
 
@@ -499,7 +512,12 @@
         // 更新当前索引为验证过的值
         currentEpisodeIndex = index;
 
-        episodesReversed = localStorage.getItem('episodesReversed') === 'true';
+        try {
+          episodesReversed = localStorage.getItem('episodesReversed') === 'true';
+        } catch (e) {
+          console.warn('localStorage不可用，使用默认排序');
+          episodesReversed = false;
+        }
       } catch (e) {
         console.error('获取集数信息失败:', e);
         currentEpisodes = [];
@@ -515,8 +533,12 @@
             currentEpisodes = episodes;
             console.log('成功获取集数信息:', currentEpisodes.length);
 
-            // 保存到localStorage
-            localStorage.setItem('currentEpisodes', JSON.stringify(currentEpisodes));
+            // 尝试保存到localStorage（在非无痕模式下）
+            try {
+              localStorage.setItem('currentEpisodes', JSON.stringify(currentEpisodes));
+            } catch (e) {
+              console.warn('无法保存到localStorage（可能是无痕模式）');
+            }
 
             // 重新更新UI
             updateEpisodeInfo();
@@ -1213,12 +1235,14 @@
       currentEpisodeIndex = index;
       videoHasEnded = false; // 重置视频结束标志
 
-      // 获取当前URL参数，保留source参数
+      // 获取当前URL参数，保留所有重要参数
       const urlParams = new URLSearchParams(window.location.search);
       const sourceName = urlParams.get('source') || '';
       const sourceCode = urlParams.get('source_code') || '';
+      const vodId = urlParams.get('vod_id') || '';
+      const apiParams = urlParams.get('api_params') || '';
 
-      // 更新URL，不刷新页面，保留source参数
+      // 更新URL，不刷新页面，保留所有重要参数
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.set('index', index);
       newUrl.searchParams.set('url', url);
@@ -1227,6 +1251,12 @@
       }
       if (sourceCode) {
         newUrl.searchParams.set('source_code', sourceCode);
+      }
+      if (vodId) {
+        newUrl.searchParams.set('vod_id', vodId);
+      }
+      if (apiParams) {
+        newUrl.searchParams.set('api_params', apiParams);
       }
       window.history.pushState({}, '', newUrl);
 
@@ -1872,10 +1902,6 @@
       // 发送URL推送请求
       sendUrlRequest(serverUrl, urlToSend, 0);
 
-      // // 间隔10秒后发送ESP32按键请求
-      // setTimeout(() => {
-      //   sendEsp32KeyRequest(esp32KeyUrl, 0);
-      // }, 6000);
     }
 
     // 发送URL推送请求的函数，支持重试
@@ -1932,60 +1958,6 @@
       document.body.appendChild(iframe);
     }
 
-    // 发送ESP32按键请求的函数，支持重试
-    function sendEsp32KeyRequest(esp32KeyUrl, retryCount) {
-      const maxRetries = 5;
-
-      // 使用隐藏的iframe方式发送请求，避免CORS限制
-      const iframeId = "esp32Iframe" + new Date().getTime() + "_" + retryCount;
-      const iframe = document.createElement('iframe');
-      iframe.id = iframeId;
-      iframe.style.display = 'none';
-
-      // 设置超时处理
-      const timeoutId = setTimeout(function () {
-        if (retryCount < maxRetries) {
-          console.log(`ESP32按键推送超时，正在重试 (${retryCount + 1}/${maxRetries})`);
-          if (document.getElementById(iframeId)) {
-            document.body.removeChild(iframe);
-          }
-          // 重试
-          sendEsp32KeyRequest(esp32KeyUrl, retryCount + 1);
-        } else {
-          console.log("ESP32按键推送超时，已达到最大重试次数");
-          if (document.getElementById(iframeId)) {
-            document.body.removeChild(iframe);
-          }
-        }
-      }, 10000); // 10秒超时
-
-      // 加载完成或出错时的处理
-      iframe.onload = function () {
-        clearTimeout(timeoutId);
-        console.log("ESP32按键推送成功");
-        document.body.removeChild(iframe);
-      };
-
-      iframe.onerror = function () {
-        clearTimeout(timeoutId);
-        if (retryCount < maxRetries) {
-          console.log(`ESP32按键推送失败，正在重试 (${retryCount + 1}/${maxRetries})`);
-          document.body.removeChild(iframe);
-          // 重试
-          sendEsp32KeyRequest(esp32KeyUrl, retryCount + 1);
-        } else {
-          console.log("ESP32按键推送失败，已达到最大重试次数");
-          document.body.removeChild(iframe);
-        }
-      };
-
-      // 设置iframe的src为ESP32按键URL
-      iframe.src = esp32KeyUrl;
-
-      // 添加到文档中
-      document.body.appendChild(iframe);
-    }
-
     // 获取集数信息的函数
     async function fetchEpisodesInfo(title, sourceCode) {
       if (!title || !sourceCode) {
@@ -1995,6 +1967,32 @@
 
       try {
         console.log(`尝试获取 "${title}" 的集数信息，来源: ${sourceCode}`);
+
+        // 首先检查URL参数中是否有vod_id和api_params
+        const urlParams = new URLSearchParams(window.location.search);
+        const vodId = urlParams.get('vod_id');
+        const apiParams = urlParams.get('api_params');
+
+        if (vodId && apiParams) {
+          console.log(`使用URL参数中的vod_id: ${vodId} 直接获取详情`);
+
+          // 直接使用相对路径，fetch拦截器会处理
+          const detailUrl = `/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`;
+          console.log('详情API请求URL:', detailUrl);
+
+          const detailResponse = await fetch(detailUrl);
+          const detailData = await detailResponse.json();
+
+          if (detailData.episodes && detailData.episodes.length > 0) {
+            console.log(`成功通过vod_id获取 "${title}" 的集数信息，共 ${detailData.episodes.length} 集`);
+            return detailData.episodes;
+          } else {
+            console.log('通过vod_id获取的详情中没有找到集数信息');
+          }
+        }
+
+        // 如果没有vod_id或获取失败，回退到搜索方式
+        console.log('回退到搜索方式获取集数信息');
 
         // 首先尝试搜索视频以获取ID
         let searchParams = '';
@@ -2009,18 +2007,18 @@
           searchParams = '&source=' + sourceCode;
         }
 
-        const searchUrl = `/api/search?keyword=${encodeURIComponent(title)}${searchParams}`;
+        const searchUrl = `/api/search?wd=${encodeURIComponent(title)}${searchParams}`;
         const searchResponse = await fetch(searchUrl);
         const searchData = await searchResponse.json();
 
-        if (!searchData.results || searchData.results.length === 0) {
+        if (!searchData.list || searchData.list.length === 0) {
           console.log('搜索结果为空，无法获取集数信息');
           return [];
         }
 
         // 查找最匹配的结果（标题完全匹配优先）
         let targetResult = null;
-        for (const result of searchData.results) {
+        for (const result of searchData.list) {
           if (result.vod_name === title) {
             targetResult = result;
             break;
@@ -2029,7 +2027,7 @@
 
         // 如果没有完全匹配的，使用第一个结果
         if (!targetResult) {
-          targetResult = searchData.results[0];
+          targetResult = searchData.list[0];
           console.log(`未找到完全匹配的结果，使用第一个结果: ${targetResult.vod_name}`);
         }
 
@@ -2061,6 +2059,7 @@
         return [];
       }
     }
+
   </script>
 </body>
 
