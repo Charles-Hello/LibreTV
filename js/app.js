@@ -876,12 +876,23 @@ async function showDetails(id, vod_name, sourceCode) {
         const sourceName = data.videoInfo && data.videoInfo.source_name ?
           data.videoInfo.source_name : '';
 
+        // 生成视频唯一标识符
+        const videoIdentifier = generateVideoIdentifier(vod_name, sourceCode, id);
+
         // 保存当前状态到localStorage，让播放页面可以获取
         const currentVideoTitle = vod_name;
         localStorage.setItem('currentVideoTitle', currentVideoTitle);
         localStorage.setItem('currentEpisodeIndex', 0);
-        localStorage.setItem('currentEpisodes', JSON.stringify(currentEpisodes));
-        localStorage.setItem('episodesReversed', false);
+        localStorage.setItem(`currentEpisodes_${videoIdentifier}`, JSON.stringify(currentEpisodes));
+        localStorage.setItem(`episodesReversed_${videoIdentifier}`, false);
+
+        // 清理旧的通用缓存键（兼容性处理）
+        try {
+          localStorage.removeItem('currentEpisodes');
+          localStorage.removeItem('episodesReversed');
+        } catch (e) {
+          // 忽略清理错误
+        }
 
         // 构建视频信息对象，使用标题作为唯一标识
         const videoTitle = vod_name || currentVideoTitle;
@@ -990,10 +1001,22 @@ function playVideo(url, vod_name, sourceCode, episodeIndex = 0, vod_id = '', api
 
   // 保存当前状态到localStorage，让播放页面可以获取
   const currentVideoTitle = vod_name;
+
+  // 生成视频唯一标识符
+  const videoIdentifier = generateVideoIdentifier(vod_name, sourceCode, vod_id);
+
   localStorage.setItem('currentVideoTitle', currentVideoTitle);
   localStorage.setItem('currentEpisodeIndex', episodeIndex);
-  localStorage.setItem('currentEpisodes', JSON.stringify(currentEpisodes));
-  localStorage.setItem('episodesReversed', episodesReversed);
+  localStorage.setItem(`currentEpisodes_${videoIdentifier}`, JSON.stringify(currentEpisodes));
+  localStorage.setItem(`episodesReversed_${videoIdentifier}`, episodesReversed);
+
+  // 清理旧的通用缓存键（兼容性处理）
+  try {
+    localStorage.removeItem('currentEpisodes');
+    localStorage.removeItem('episodesReversed');
+  } catch (e) {
+    // 忽略清理错误
+  }
 
   // 构建视频信息对象，使用标题作为唯一标识
   const videoTitle = vod_name || currentVideoTitle;
@@ -1202,4 +1225,20 @@ if (config.auth.enabled) {
 
 // 或者针对特定路由
 app.use('/api', authMiddleware);
+
+// 生成视频唯一标识符的函数
+function generateVideoIdentifier(title, sourceCode, vodId) {
+  // 使用标题、来源代码和视频ID生成唯一标识符
+  const cleanTitle = (title || '').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '').substring(0, 20);
+  const cleanSource = (sourceCode || '').replace(/[^a-zA-Z0-9]/g, '');
+  const cleanVodId = (vodId || '').replace(/[^a-zA-Z0-9]/g, '');
+
+  // 如果有vodId，优先使用它作为主要标识符
+  if (cleanVodId) {
+    return `${cleanSource}_${cleanVodId}`;
+  }
+
+  // 否则使用标题和来源的组合
+  return `${cleanSource}_${cleanTitle}`;
+}
 
