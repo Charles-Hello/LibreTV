@@ -1847,66 +1847,18 @@
       }
     }
 
-    // 返回上一页功能 - 支持跨域 iframe 和独立页面
+    // 返回上一页功能 - 使用原生浏览器返回
     function goBack() {
       // 保存当前播放进度
       saveCurrentProgress();
 
-      // 检测是否在 iframe 中
-      const isInIframe = window.self !== window.top;
-
-      if (isInIframe) {
-        // 在 iframe 中的处理策略
-        try {
-          // 尝试通知父页面执行返回操作（可能因跨域失败）
-          window.parent.postMessage({
-            type: 'PLAYER_GO_BACK',
-            source: 'libretv-player'
-          }, '*');
-
-          // 等待短时间看父页面是否响应
-          setTimeout(() => {
-            // 如果还在播放页面，说明父页面没有处理消息
-            // 使用 sessionStorage 保存状态并导航回主页面
-            try {
-              // 保存返回信息到 sessionStorage
-              const returnInfo = {
-                shouldRestoreModal: true,
-                timestamp: Date.now(),
-                fromPlayer: true
-              };
-              sessionStorage.setItem('libretv_return_from_player', JSON.stringify(returnInfo));
-
-              // 导航到主页面，让主页面的 SPA 系统处理恢复
-              window.location.href = '/';
-            } catch (storageError) {
-              console.warn('无法保存返回状态:', storageError);
-              // 最后备用：直接返回主页面
-              window.location.href = '/';
-            }
-          }, 300);
-        } catch (error) {
-          console.warn('无法与父页面通信:', error);
-          // 直接使用 sessionStorage 方案
-          try {
-            const returnInfo = {
-              shouldRestoreModal: true,
-              timestamp: Date.now(),
-              fromPlayer: true
-            };
-            sessionStorage.setItem('libretv_return_from_player', JSON.stringify(returnInfo));
-            window.location.href = '/';
-          } catch (storageError) {
-            window.location.href = '/';
-          }
-        }
+      // 使用原生浏览器返回功能
+      // 这将触发主页面的 popstate 事件，实现真正的SPA导航
+      if (window.history.length > 1) {
+        window.history.back();
       } else {
-        // 独立页面，使用原生浏览器返回功能
-        if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          window.location.href = '/';
-        }
+        // 如果没有历史记录，返回首页
+        window.location.href = '/';
       }
     }
 
