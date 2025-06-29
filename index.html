@@ -500,6 +500,30 @@
       }, 100);
     });
 
+    // 监听来自 iframe 播放器的消息
+    window.addEventListener('message', function (event) {
+      // 安全检查：确保消息来源可信
+      if (event.data && event.data.type === 'PLAYER_GO_BACK' && event.data.source === 'libretv-player') {
+        console.log('收到播放器返回请求');
+
+        // 使用 SPA 导航系统执行返回操作
+        if (window.navigationManager) {
+          // 如果当前不在首页，使用浏览器原生返回
+          if (window.navigationManager.canGoBack()) {
+            history.back();
+          } else {
+            // 如果已经在首页，导航到首页
+            window.navigationManager.navigateToHome();
+          }
+        } else {
+          // 备用方案：使用浏览器返回
+          if (window.history.length > 1) {
+            history.back();
+          }
+        }
+      }
+    });
+
     // 重写 resetToHome 函数以支持 SPA 导航
     window.resetToHome = function () {
       if (window.navigationManager) {
