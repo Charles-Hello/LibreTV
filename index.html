@@ -481,6 +481,9 @@
   <script>
     // 页面加载完成后初始化 SPA 导航
     document.addEventListener('DOMContentLoaded', function () {
+      // 检查是否从播放器返回
+      checkReturnFromPlayer();
+
       // 等待导航管理器初始化完成
       setTimeout(() => {
         if (window.navigationManager) {
@@ -499,6 +502,41 @@
         }
       }, 100);
     });
+
+    // 检查是否从播放器返回
+    function checkReturnFromPlayer() {
+      try {
+        const returnInfo = sessionStorage.getItem('libretv_return_from_player');
+        if (returnInfo) {
+          const info = JSON.parse(returnInfo);
+
+          // 检查时间戳，确保不是很久之前的数据
+          const timeDiff = Date.now() - info.timestamp;
+          if (timeDiff < 60000 && info.fromPlayer && info.shouldRestoreModal) { // 1分钟内
+            console.log('检测到从播放器返回，准备恢复状态');
+
+            // 清除标记
+            sessionStorage.removeItem('libretv_return_from_player');
+
+            // 等待导航管理器初始化后恢复状态
+            setTimeout(() => {
+              if (window.navigationManager) {
+                // 检查是否有保存的模态框状态
+                const currentState = window.navigationManager.getCurrentState();
+                if (currentState.modalOpen && currentState.modalVideoData) {
+                  console.log('恢复模态框状态');
+                  window.navigationManager.showSearchPage();
+                } else {
+                  console.log('没有找到可恢复的模态框状态');
+                }
+              }
+            }, 200);
+          }
+        }
+      } catch (error) {
+        console.warn('检查返回状态时出错:', error);
+      }
+    }
 
     // 监听来自 iframe 播放器的消息
     window.addEventListener('message', function (event) {

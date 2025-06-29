@@ -1847,7 +1847,7 @@
       }
     }
 
-    // 返回上一页功能 - 支持 iframe 和独立页面
+    // 返回上一页功能 - 支持跨域 iframe 和独立页面
     function goBack() {
       // 保存当前播放进度
       saveCurrentProgress();
@@ -1856,30 +1856,47 @@
       const isInIframe = window.self !== window.top;
 
       if (isInIframe) {
-        // 在 iframe 中，使用 postMessage 通知父页面
+        // 在 iframe 中的处理策略
         try {
-          // 尝试通知父页面执行返回操作
+          // 尝试通知父页面执行返回操作（可能因跨域失败）
           window.parent.postMessage({
             type: 'PLAYER_GO_BACK',
             source: 'libretv-player'
           }, '*');
 
-          // 等待一小段时间，如果父页面没有处理，则使用备用方案
+          // 等待短时间看父页面是否响应
           setTimeout(() => {
-            // 备用方案：尝试在 iframe 内返回
-            if (window.history.length > 1) {
-              window.history.back();
-            } else {
-              // 最后备用：返回首页
+            // 如果还在播放页面，说明父页面没有处理消息
+            // 使用 sessionStorage 保存状态并导航回主页面
+            try {
+              // 保存返回信息到 sessionStorage
+              const returnInfo = {
+                shouldRestoreModal: true,
+                timestamp: Date.now(),
+                fromPlayer: true
+              };
+              sessionStorage.setItem('libretv_return_from_player', JSON.stringify(returnInfo));
+
+              // 导航到主页面，让主页面的 SPA 系统处理恢复
+              window.location.href = '/';
+            } catch (storageError) {
+              console.warn('无法保存返回状态:', storageError);
+              // 最后备用：直接返回主页面
               window.location.href = '/';
             }
-          }, 500);
+          }, 300);
         } catch (error) {
           console.warn('无法与父页面通信:', error);
-          // 出错时使用备用方案
-          if (window.history.length > 1) {
-            window.history.back();
-          } else {
+          // 直接使用 sessionStorage 方案
+          try {
+            const returnInfo = {
+              shouldRestoreModal: true,
+              timestamp: Date.now(),
+              fromPlayer: true
+            };
+            sessionStorage.setItem('libretv_return_from_player', JSON.stringify(returnInfo));
+            window.location.href = '/';
+          } catch (storageError) {
             window.location.href = '/';
           }
         }
