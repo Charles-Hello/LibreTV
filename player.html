@@ -821,17 +821,17 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'none';
 
-                //   // 电脑端自动全屏
-                //   if (isDesktopDevice && dp && !dp.fullScreen.isFullScreen()) {
-                //     setTimeout(() => {
-                //       try {
-                //         // dp.fullScreen.request();
-                //         // console.log('电脑端自动进入全屏模式');
-                //       } catch (e) {
-                //         // console.warn('自动全屏失败:', e);
-                //       }
-                //     }, 1000); // 延迟1秒确保播放器完全加载
-                //   }
+                // 电脑端自动全屏
+                if (isDesktopDevice && dp && !dp.fullScreen.isFullScreen()) {
+                  setTimeout(() => {
+                    try {
+                      dp.fullScreen.request();
+                      console.log('电脑端自动进入全屏模式');
+                    } catch (e) {
+                      console.warn('自动全屏失败:', e);
+                    }
+                  }, 1000); // 延迟1秒确保播放器完全加载
+                }
               });
 
               // 监听视频进度事件
@@ -1847,64 +1847,14 @@
       }
     }
 
-    // 返回上一页功能
+    // 返回上一页功能 - 使用原生浏览器返回
     function goBack() {
       // 保存当前播放进度
       saveCurrentProgress();
 
-      // 检查是否在iframe中
-      const isInIframe = window.self !== window.top;
-
-      if (isInIframe) {
-        // 在iframe中的处理逻辑
-        try {
-          // 尝试通知父页面返回
-          if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({
-              type: 'goBack',
-              source: 'libretv-player'
-            }, '*');
-
-            // 等待一段时间，如果父页面没有响应，则使用备用方案
-            setTimeout(() => {
-              handleIframeBackup();
-            }, 500);
-          } else {
-            handleIframeBackup();
-          }
-        } catch (e) {
-          console.warn('无法与父页面通信:', e);
-          handleIframeBackup();
-        }
-      } else {
-        // 不在iframe中的正常处理
-        handleNormalBack();
-      }
-    }
-
-    // 处理iframe中的备用返回方案
-    function handleIframeBackup() {
-      // 尝试从URL参数中获取来源页面
-      const urlParams = new URLSearchParams(window.location.search);
-      const referrer = urlParams.get('referrer') || urlParams.get('from');
-
-      if (referrer) {
-        // 如果有来源页面参数，跳转到该页面
-        window.location.href = decodeURIComponent(referrer);
-      } else if (document.referrer && document.referrer !== window.location.href) {
-        // 尝试使用document.referrer
-        window.location.href = document.referrer;
-      } else {
-        // 最后的备用方案：返回首页
-        window.location.href = '/';
-      }
-    }
-
-    // 处理正常环境下的返回
-    function handleNormalBack() {
-      // 检查是否有历史记录可以返回
+      // 使用原生浏览器返回功能
+      // 这将触发主页面的 popstate 事件，实现真正的SPA导航
       if (window.history.length > 1) {
-        // 使用浏览器历史记录返回
         window.history.back();
       } else {
         // 如果没有历史记录，返回首页

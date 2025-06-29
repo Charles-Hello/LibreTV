@@ -258,6 +258,12 @@
       <div id="searchArea" class="flex-1 flex flex-col items-center justify-center">
         <div class="w-full max-w-2xl">
           <div class="flex items-stretch mb-3 h-14 shadow-lg rounded-lg overflow-hidden search-container">
+            <!-- 返回按钮 -->
+            <button id="backButton" onclick="history.back()" style="display: none;"
+              class="w-20 sm:w-24 flex items-center justify-center bg-gradient-to-r from-[#888] to-[#666] text-white font-medium hover:from-[#666] hover:to-[#888] transition-all duration-300"
+              aria-label="返回上一页" title="返回上一页">
+              ← 返回
+            </button>
             <!-- 首页按钮 -->
             <button onclick="resetToHome()"
               class="w-20 sm:w-24 flex items-center justify-center bg-gradient-to-r from-[#00ccff] to-[#0099cc] text-white font-medium hover:from-[#0099cc] hover:to-[#00ccff] transition-all duration-300"
@@ -448,6 +454,7 @@
   <script src="js/ui.js"></script>
   <script src="js/api.js"></script>
   <script src="js/password.js"></script>
+  <script src="js/navigation.js"></script>
   <script src="js/app.js"></script>
   <script src="js/douban.js"></script>
 
@@ -470,20 +477,43 @@
     window.__ENV__.PASSWORD = "{{PASSWORD}}";
   </script>
 
-  <!-- 监听来自iframe的消息 -->
+  <!-- SPA 导航集成脚本 -->
   <script>
-    window.addEventListener('message', function (event) {
-      // 验证消息来源和类型
-      if (event.data && event.data.type === 'goBack' && event.data.source === 'libretv-player') {
-        // 处理返回请求
-        if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          // 如果没有历史记录，可以执行其他操作
-          console.log('收到iframe返回请求，但没有历史记录可返回');
+    // 页面加载完成后初始化 SPA 导航
+    document.addEventListener('DOMContentLoaded', function () {
+      // 等待导航管理器初始化完成
+      setTimeout(() => {
+        if (window.navigationManager) {
+          // 检查URL参数是否有搜索查询
+          const urlParams = new URLSearchParams(window.location.search);
+          const query = urlParams.get('q');
+
+          if (query) {
+            // 如果URL中有搜索查询，设置搜索框并保持在搜索状态
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+              searchInput.value = query;
+            }
+            // 注意：这里不自动执行搜索，因为用户可能是通过浏览器返回到这个状态
+          }
         }
-      }
+      }, 100);
     });
+
+    // 重写 resetToHome 函数以支持 SPA 导航
+    window.resetToHome = function () {
+      if (window.navigationManager) {
+        window.navigationManager.navigateToHome();
+      } else {
+        // 降级处理
+        window.location.href = '/';
+      }
+    };
+
+    // 重写搜索函数以支持 SPA 导航
+    if (typeof window.search === 'function') {
+      window.originalSearch = window.search;
+    }
   </script>
 </body>
 
